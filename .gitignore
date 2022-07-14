@@ -1,0 +1,11 @@
+# Note: If you accidentally commited the large files (i.e., above 100MB), your current push cannot be executed.
+# quick fix: https://stackoverflow.com/questions/19573031/cant-push-to-github-because-of-large-file-which-i-already-deleted (accessed: 27th March 22)
+# don't forget to locally save a backup of your work!
+# 1. locally delete the large file(s)
+# 2. commit: $ git add .; $ git commit -m "new commit"
+# 3. soft reset: $ git reset --soft HEAD~3 (with 3 instead being the number of erroneous commits you already pushed)
+# 4. squash (i.e., recommit): git commit -m "squash commit"
+# 5. push: git push origin master
+paper_8000V.txt
+simdata__erbkg_edrift_200__eLife_us_1000_g1_0_18__g2_76_6725.npy
+simdata__wimps_edrift_200__eLife_us_1000_g1_0_18__g2_76_6725.npy
