@@ -20,22 +20,20 @@ import json
 ############################################
 
 
-# paths: NEST
-abspath_sfs = "/home/daniel/Desktop/arbeitsstuff/sfs/"
-abspath_nest_installation = abspath_sfs +"nest_v_2_3_9/"
+# paths and files: NEST installation
+abspath_nest_installation = "/home/daniel/Desktop/arbeitsstuff/sfs/nest_v_2_3_9/"
 abspath_nest_installation_install = abspath_nest_installation +"install/"
 abspath_nest_installation_build = abspath_nest_installation +"build/"
 abspath_nest_installation_nest = abspath_nest_installation +"nest/"
-abspath_nest_installation_detectors = abspath_nest_installation_nest +"include/Detectors/"
-
-# paths: this study
-abspath_this_study = abspath_sfs +"github_repo_v2/"
-abspath_detectors = abspath_this_study +"detectors/"
-abspath_spectra = abspath_this_study +"spectra/"
+abspath_nest_installation_nest_include_detectors = abspath_nest_installation_nest +"include/Detectors/"
+abspathfile_nest_installation_execNEST_cpp = abspath_nest_installation_nest +"src/execNEST.cpp"
+abspathfile_nest_installation_execNEST_bin = abspath_nest_installation_install +"bin/execNEST"
 
 
-# files
-abspathfile_execNEST_bin = abspath_nest_installation_install +"bin/execNEST"
+# paths and files: sfs repo
+abspath_sfs_repo = "/home/daniel/Desktop/arbeitsstuff/sfs/github_repo_v2/"
+abspath_sfs_repo_detectors = abspath_sfs_repo +"detectors/"
+abspath_sfs_repo_spectra = abspath_sfs_repo +"spectra/"
 
 
 # darwin baseline detector design
@@ -128,8 +126,8 @@ def convert_detector_dict_into_detector_header(
     # adding the initial lines
     if flag_verbose: print(f"{fn}: adding initial lines to 'line_list'.")
     line_list = line_list +[
-        "#ifndef " +detector_name,
-        "#define " +detector_name +" 1",
+        "#ifndef " +detector_name +"_hh",
+        "#define " +detector_name +"_hh 1",
         "",
         '#include "VDetector.hh"',
         "",
@@ -138,14 +136,12 @@ def convert_detector_dict_into_detector_header(
         "class " +detector_name +" : public VDetector {",
         "    public:",
         "        " +detector_name +"() {",
-        f'            cout << "You are currently using the detector {detector_name}."',
-        "            << endl;",
         "",
         "            Initialization();",
         "        };",
-        "        virtual ~" +detector_name +"(){};",
+        "        ~" +detector_name +"() override = default;",
         "",
-        "        virtual void Initialization() {",
+        "        void Initialization() override {",
     ]
 
     # filling 'line_list' with detector parameters
@@ -156,7 +152,9 @@ def convert_detector_dict_into_detector_header(
     # adding the final lines
     if flag_verbose: print(f"{fn}: adding final lines to 'line_list'.")
     line_list = line_list +[
-        "        }",
+        "        };",
+        "    };",
+        "#endif",
     ]
 
     # writing all lines into output .hh file
@@ -174,7 +172,7 @@ def execNEST(
     spectrum_dict, # dict, dictionary resembling the input spectrum to be simulated by NEST
     detector_dict = {}, # dict or abspath-string, dictionary or .json-file resembling the detector the spectrum is supposed to be simulated in
     detector_name = "temp", # string, name of the detector
-    abspathfile_execNEST_binary = abspathfile_execNEST_bin, # string, abspathfile of the 'execNEST' executiable generated in the 'install' NEST folder
+    abspathfile_execNEST_binary = abspathfile_nest_installation_execNEST_bin, # string, abspathfile of the 'execNEST' executiable generated in the 'install' NEST folder
     baseline_detector_dict = darwin_baseline_detector_dict, # string, abspathfile of the DARWIN baseline detector
     flag_verbose = False, # bool, flag indicating whether the print-statements are being printed
 ):
@@ -212,7 +210,7 @@ def execNEST(
             new_detector_dict = baseline_detector_dict.update(detector_dict)
             convert_detector_dict_into_detector_header(
                 detector_dict = new_detector_dict,
-                abspath_output_list = [abspath_detectors, abspath_nest_installation_detectors],
+                abspath_output_list = [abspath_this_study_detectors, abspath_nest_installation_nest_include_detectors],
                 detector_name = detector_name,
                 flag_verbose = flag_verbose,
             )
@@ -221,7 +219,7 @@ def execNEST(
 
     ### executing the 'execNEST' executable to simulate the input spectrum
     if flag_verbose: print(f"{fn}: compiling the 'execNEST' command strings")
-    if spectrum_dict["type_interaction"]=="ER":
+    if spectrum_dict["type_interaction"] in ["ER", "NR", "gamma", "beta"]:
         # non-necessary default values
         default_seed = 0
         seed = default_seed
@@ -400,7 +398,69 @@ def make_clean_reinstall(
     return
 
 
+def install_detector_header_file(
+    abspathfile_new_detector_hh,
+    abspathfile_nest_execNEST_cpp = abspathfile_nest_installation_execNEST_cpp,
+    abspath_nest_detectors = abspath_nest_installation_nest_include_detectors,
+    flag_clean_reinstall = False,
+    flag_verbose = False,
+):
 
+    """
+    This function is used to implement the specified new detector header file 'abspathfile_new_detector_hh' into the current NEST installation.
+    """
+
+    # initialization
+    detector_name = list(abspathfile_new_detector_hh[:-3].split("/"))[-1]
+    fn = "install_detector_header_file"
+    if flag_verbose : print(f"\n{fn}: initialization")
+
+    # copying the detector files
+    if flag_verbose : print(f"{fn}: copying '{abspathfile_new_detector_hh}' into {abspath_nest_detectors}")
+    cmd_string = f"cp {abspathfile_new_detector_hh} {abspath_nest_detectors}{detector_name}.hh"
+    cmd_return = subprocess.run(cmd_string, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout = cmd_return.stdout.decode('utf-8')
+    stderr = cmd_return.stderr.decode('utf-8')
+    print(f"stdout: '{stdout}'")
+    print(f"stderr: '{stderr}'")
+
+    # reading the 'execNEST.cpp' file
+    if flag_verbose : print(f"{fn}: reading '{abspathfile_nest_execNEST_cpp}'")
+    line_list = []
+    with open(abspathfile_nest_execNEST_cpp, 'r') as inputfile:
+        for line in inputfile:
+            line_list.append(line)
+
+    # modifying the extracted lines
+    if flag_verbose : print(f"{fn}: modifying '{abspathfile_nest_execNEST_cpp}'")
+    for k, line in enumerate(line_list):
+        if "include" in line and "etector" in line and ".hh" in line:
+            new_line = f'#include "{detector_name}.hh"\n'
+            line_list[k] = new_line
+            if flag_verbose : print(f"\tinserted '{new_line}'")
+        elif "auto* detector = new " in line:
+            new_line = f"  auto* detector = new {detector_name}();\n"
+            line_list[k] = new_line
+            if flag_verbose : print(f"\tinserted '{new_line}'")
+        elif 'cerr << "You are currently using the' in line:
+            new_line = f'    cerr << "You are currently using the {detector_name} detector." << endl\n'
+            line_list[k] = new_line
+            if flag_verbose : print(f"\tinserted '{new_line}'")
+        else:
+            continue
+
+    # write new file
+    if flag_verbose : print(f"{fn}: saving modified version of '{abspathfile_nest_execNEST_cpp}'")
+    with open(abspathfile_nest_execNEST_cpp, 'w') as outputfile:
+        for line in line_list:
+            outputfile.write(line)
+
+    # performing a clean re-install
+    if flag_clean_reinstall:
+        if flag_verbose : print(f"{fn}: performing clean reinstall")
+        make_clean_reinstall(flag_verbose=flag_verbose)
+
+    return
 
 
 ############################################

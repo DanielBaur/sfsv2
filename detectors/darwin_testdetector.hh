@@ -1,5 +1,5 @@
-#ifndef darwin_testdetector
-#define darwin_testdetector 1
+#ifndef darwin_testdetector_hh
+#define darwin_testdetector_hh 1
 
 #include "VDetector.hh"
 
@@ -8,14 +8,12 @@ using namespace std;
 class darwin_testdetector : public VDetector {
     public:
         darwin_testdetector() {
-            cout << "You are currently using the detector darwin_testdetector."
-            << endl;
 
             Initialization();
         };
-        virtual ~darwin_testdetector(){};
+        ~darwin_testdetector() override = default;
 
-        virtual void Initialization() {
+        void Initialization() override {
             g1                   =   0.117;
             sPEres               =   0.37;
             sPEthr               =   0.3845901639344262;
@@ -49,4 +47,6 @@ class darwin_testdetector : public VDetector {
             cathode              =   55.9;
             PosResExp            =   0.015;
             PosResBase           =   70.8364;
-        }
+        };
+    };
+#endif
