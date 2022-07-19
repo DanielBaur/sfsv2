@@ -168,153 +168,6 @@ def convert_detector_dict_into_detector_header(
     return
 
 
-def execNEST(
-    spectrum_dict, # dict, dictionary resembling the input spectrum to be simulated by NEST
-    detector_dict = {}, # dict or abspath-string, dictionary or .json-file resembling the detector the spectrum is supposed to be simulated in
-    detector_name = "temp", # string, name of the detector
-    abspathfile_execNEST_binary = abspathfile_nest_installation_execNEST_bin, # string, abspathfile of the 'execNEST' executiable generated in the 'install' NEST folder
-    baseline_detector_dict = darwin_baseline_detector_dict, # string, abspathfile of the DARWIN baseline detector
-    flag_verbose = False, # bool, flag indicating whether the print-statements are being printed
-):
-
-    """
-    This function is used to execute the 'execNEST' C++ executable from the NEST installation.
-    Returns the NEST output in the form of a numpy structured array.
-    """
-
-    ### initializing
-    fn = "execNEST" # name of this function, required for the print statements
-    if flag_verbose: print(f"\n{fn}: initializing")
-    execNEST_output_tuple_list = []
-    cmd_list = []
-    debug_list = []
-
-    ### detector adaptation
-    # check if no detector was specified
-    if detector_dict == {}:
-        if flag_verbose: print(f"{fn}: no detector specified --> running with the pre-installed detector")
-        pass
-    else:
-        if type(detector_dict)==str:
-            if detector_dict.endswith(".hh"):
-                if flag_verbose: print(f"{fn}: specified detector as .hh-file: {detector_dict}")
-                new_detector_hh_abspathfile = detector_dict
-            elif detector_dict.endswith(".json"):
-                if flag_verbose: print(f"{fn}: specified detector as .json-file: {detector_dict}")
-                if flag_verbose: print(f"{fn}: updating baseline detector: {abspathfile_baseline_detector_json}")
-                new_detector_dict = baseline_detector_dict.update(get_dict_from_json(detector_dict))
-                #new_detector_hh_abspathfile = convert_detector_dict_into_header_file()
-        elif type(detector_dict)==dict:
-            if flag_verbose: print(f"{fn}: specified detector as dictionary: {detector_dict}")
-            if flag_verbose: print(f"{fn}: updating baseline detector: {abspathfile_baseline_detector_json}")
-            new_detector_dict = baseline_detector_dict.update(detector_dict)
-            convert_detector_dict_into_detector_header(
-                detector_dict = new_detector_dict,
-                abspath_output_list = [abspath_this_study_detectors, abspath_nest_installation_nest_include_detectors],
-                detector_name = detector_name,
-                flag_verbose = flag_verbose,
-            )
-        if flag_verbose: print(f"{fn}: installing new detector header file")
-        install_detector_header_file() # including: make_clean_reinstall(flag_verbose=flag_verbose)
-
-    ### executing the 'execNEST' executable to simulate the input spectrum
-    if flag_verbose: print(f"{fn}: compiling the 'execNEST' command strings")
-    if spectrum_dict["type_interaction"] in ["ER", "NR", "gamma", "beta"]:
-        # non-necessary default values
-        default_seed = 0
-        seed = default_seed
-        if "seed" in [*spectrum_dict]:
-            if spectrum_dict["seed"] != 0:
-                seed = spectrum_dict["seed"]
-        default_xyz = "-1 -1 -1"
-        xyz = default_xyz
-        if "x,y,z-position[mm]" in [*spectrum_dict]:
-            if spectrum_dict["x,y,z-position[mm]"] not in [0, "", default_xyz]:
-                xyz = spectrum_dict["x,y,z-position[mm]"]
-        # case: spectrum consists of single energy interval (typically used for quick tests)
-        if type(spectrum_dict["numEvts"]) in [str,int]:
-            cmd_string = " ".join([
-                abspathfile_execNEST_binary,
-                str(spectrum_dict["numEvts"]),
-                str(spectrum_dict["type_interaction"]),
-                str(spectrum_dict["E_min[keV]"]),
-                str(spectrum_dict["E_max[keV]"]),
-                str(spectrum_dict["field_drift[V/cm]"]),
-                str(xyz),
-                str(seed)])
-            cmd_list.append(cmd_string)
-        # case: spectrum consists of multiple energy intervals (typically used for actual spectra processing)
-        elif hasattr(spectrum_dict["numEvts"], "__len__"):
-            # checking validity of input 'spectrum_dict'
-            if len(spectrum_dict["numEvts"])==len(spectrum_dict["E_min[keV]"])==len(spectrum_dict["E_max[keV]"]):
-                if flag_verbose: print(f"\tinput 'spectrum_dict' appears valid")
-            else:
-                raise Exception(f"ERROR: len(spectrum_dict['numEvts'])==len(spectrum_dict['E_min[keV]'])==len(spectrum_dict['E_max[keV]'])")
-            # looping over all resulting 'cmd_strings'
-            for k, num in enumerate(spectrum_dict["numEvts"]):
-                cmd_string = " ".join([
-                    abspathfile_execNEST_binary,
-                    str(spectrum_dict["numEvts"][k]),
-                    str(spectrum_dict["type_interaction"]),
-                    str(spectrum_dict["E_min[keV]"][k]),
-                    str(spectrum_dict["E_max[keV]"][k]),
-                    str(spectrum_dict["field_drift[V/cm]"]),
-                    str(xyz),
-                    str(seed)])
-                cmd_list.append(cmd_string)
-
-    ### looping over all commands and executing them
-    for k, cmd_string in enumerate(cmd_list):
-        if flag_verbose: print(f"{fn}: executing '$ {cmd_string}'")
-        cmd_return = subprocess.run(cmd_string, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdout = cmd_return.stdout.decode('utf-8')
-        stderr = cmd_return.stderr.decode('utf-8')
-        debug_dict = {
-            "stderr" : stderr,
-            "cmd_string" : cmd_string,
-        }
-
-        ### writing the 'execNEST' output into 'execNEST_output_tuple_list'
-        if flag_verbose: print(f"{fn}: writing the 'execNEST' data into 'execNEST_output_tuple_list'")
-        this_nest_run_tuple_list = []
-        state = "searching_for_header_line"
-        # looping over all 'execNEST' output lines
-        if flag_verbose: print(f"\tlooping over 'execNEST' output lines")
-        for line in stdout.split("\n"):
-            line_list = list(line.split("\t"))
-            # skipping all lines that can neither be headers nor simulation output
-            if len(line_list) in [1,4,6]:
-                continue
-            # extracting header columns and simulation data
-            else:
-                if state == "searching_for_header_line":
-                    if "Nph" in line_list:
-                        state = "reading_output"
-                        dtype_list = []
-                        for header in line_list:
-                            if header in ["X,Y,Z [mm]"]:
-                                dtype_list.append((header, np.unicode_, 16))
-                            else:
-                                dtype_list.append((header, np.float64))
-
-                        execNEST_dtype = np.dtype(dtype_list)
-                        if flag_verbose == True: print(f"\textracted header: {line_list}")
-                    else:
-                        continue
-                elif state == "reading_output":
-                    execNEST_output_tuple = tuple(line_list)
-                    this_nest_run_tuple_list.append(execNEST_output_tuple)
-        execNEST_output_tuple_list += this_nest_run_tuple_list
-        num = int(spectrum_dict["numEvts"][k]) if hasattr(spectrum_dict["numEvts"], "__len__") else int(spectrum_dict["numEvts"])
-        if len(this_nest_run_tuple_list) != num: raise Exception(f"")
-
-    ### casting the 'execNEST_output_tuple_list' into a ndarray
-    if flag_verbose: print(f"{fn}: casting 'execNEST_output_tuple_list' into numpy ndarray")
-    execNEST_output_ndarray = np.array(execNEST_output_tuple_list, execNEST_dtype)
-
-    return execNEST_output_ndarray
-
-
 def make_clean_reinstall(
     abspath_build = abspath_nest_installation_build,
     flag_verbose = False,
@@ -416,13 +269,13 @@ def install_detector_header_file(
     if flag_verbose : print(f"\n{fn}: initialization")
 
     # copying the detector files
-    if flag_verbose : print(f"{fn}: copying '{abspathfile_new_detector_hh}' into {abspath_nest_detectors}")
+    if flag_verbose : print(f"{fn}: copying detector header into NEST installation")
     cmd_string = f"cp {abspathfile_new_detector_hh} {abspath_nest_detectors}{detector_name}.hh"
     cmd_return = subprocess.run(cmd_string, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout = cmd_return.stdout.decode('utf-8')
     stderr = cmd_return.stderr.decode('utf-8')
-    print(f"stdout: '{stdout}'")
-    print(f"stderr: '{stderr}'")
+    #print(f"stdout: '{stdout}'")
+    #print(f"stderr: '{stderr}'")
 
     # reading the 'execNEST.cpp' file
     if flag_verbose : print(f"{fn}: reading '{abspathfile_nest_execNEST_cpp}'")
@@ -437,20 +290,20 @@ def install_detector_header_file(
         if "include" in line and "etector" in line and ".hh" in line:
             new_line = f'#include "{detector_name}.hh"\n'
             line_list[k] = new_line
-            if flag_verbose : print(f"\tinserted '{new_line}'")
+            if flag_verbose : print(f"\tinserted '{new_line[:-1]}'")
         elif "auto* detector = new " in line:
             new_line = f"  auto* detector = new {detector_name}();\n"
             line_list[k] = new_line
-            if flag_verbose : print(f"\tinserted '{new_line}'")
+            if flag_verbose : print(f"\tinserted '{new_line[:-1]}'")
         elif 'cerr << "You are currently using the' in line:
             new_line = f'    cerr << "You are currently using the {detector_name} detector." << endl\n'
             line_list[k] = new_line
-            if flag_verbose : print(f"\tinserted '{new_line}'")
+            if flag_verbose : print(f"\tinserted '{new_line[:-1]}'")
         else:
             continue
 
     # write new file
-    if flag_verbose : print(f"{fn}: saving modified version of '{abspathfile_nest_execNEST_cpp}'")
+    if flag_verbose : print(f"{fn}: saving modified version of 'execNEST_cpp'")
     with open(abspathfile_nest_execNEST_cpp, 'w') as outputfile:
         for line in line_list:
             outputfile.write(line)
@@ -461,6 +314,198 @@ def install_detector_header_file(
         make_clean_reinstall(flag_verbose=flag_verbose)
 
     return
+
+
+def execNEST(
+    spectrum_dict, # dict, dictionary resembling the input spectrum to be simulated by NEST
+    detector_dict = {}, # dict or abspath-string, dictionary or .json-file resembling the detector the spectrum is supposed to be simulated in
+    detector_name = "", # string, name of the detector, only required when not referring to an existing file
+    abspathfile_execNEST_binary = abspathfile_nest_installation_execNEST_bin, # string, abspathfile of the 'execNEST' executiable generated in the 'install' NEST folder
+    baseline_detector_dict = darwin_baseline_detector_dict, # string, abspathfile of the DARWIN baseline detector
+    flag_verbose = False, # bool, flag indicating whether the print-statements are being printed
+    flag_print_stdout_and_stderr = False, # bool, flag indicating whether the 'stdout' and 'stderr' values returned by executing the 'execNEST' C++ executable are being printed
+):
+
+    """
+    This function is used to execute the 'execNEST' C++ executable from the NEST installation.
+    Returns the NEST output in the form of a numpy structured array.
+    """
+
+    ### initializing
+    fn = "execNEST" # name of this function, required for the print statements
+    if flag_verbose: print(f"\n{fn}: initializing")
+    execNEST_output_tuple_list = []
+    cmd_list = []
+    debug_list = []
+
+    ### detector adaptation
+    if detector_dict == {}:
+        if flag_verbose: print(f"{fn}: no detector specified --> running with the pre-installed detector")
+        pass
+    else:
+        if type(detector_dict)==str:
+            if detector_dict.endswith(".hh"):
+                detector_name = list(detector_dict[:-3].split("/"))[-1]
+                if flag_verbose: print(f"{fn}: specified detector '{detector_name}' as .hh-file: {detector_dict}")
+                new_detector_hh_abspathfile = detector_dict
+            elif detector_dict.endswith(".json"):
+                detector_name = list(detector_dict[:-5].split("/"))[-1]
+                if flag_verbose: print(f"{fn}: specified detector '{detector_name}' as .json-file: {detector_dict}")
+                if flag_verbose: print(f"{fn}: updating baseline detector: {abspathfile_baseline_detector_json}")
+                new_detector_dict = baseline_detector_dict.copy()
+                new_detector_dict.update(get_dict_from_json(detector_dict))
+                convert_detector_dict_into_detector_header()
+        elif type(detector_dict)==dict:
+            if detector_name=="" : raise Exception(f"ERROR: You did not specify a detector name!")
+            if flag_verbose: print(f"{fn}: specified detector '{detector_name}'as dictionary: {detector_dict}")
+            if flag_verbose: print(f"{fn}: updating baseline detector")
+            new_detector_dict = baseline_detector_dict.copy()
+            new_detector_dict.update(detector_dict)
+            print(new_detector_dict)
+            convert_detector_dict_into_detector_header(
+                detector_dict = new_detector_dict,
+                abspath_output_list = [abspath_sfs_repo_detectors],
+                detector_name = detector_name,
+                flag_verbose = flag_verbose,
+            )
+        text_add="\n" if detector_dict != {} else ""
+        if flag_verbose: print(text_add +f"{fn}: installing new detector header file")
+        install_detector_header_file(
+            abspathfile_new_detector_hh = abspath_sfs_repo_detectors +detector_name +".hh",
+            flag_clean_reinstall = True,
+            flag_verbose = flag_verbose)
+
+    ### executing the 'execNEST' executable to simulate the input spectrum
+    text_add="\n" if detector_dict != {} else ""
+    if flag_verbose: print(text_add +f"{fn}: compiling the 'execNEST' command strings")
+    if spectrum_dict["type_interaction"] in ["ER", "NR", "gamma", "beta"]:
+        # non-necessary default values
+        default_seed = 0
+        seed = default_seed
+        if "seed" in [*spectrum_dict]:
+            if spectrum_dict["seed"] != 0:
+                seed = spectrum_dict["seed"]
+        default_xyz = "-1 -1 -1"
+        xyz = default_xyz
+        if "x,y,z-position[mm]" in [*spectrum_dict]:
+            if spectrum_dict["x,y,z-position[mm]"] not in [0, "", default_xyz]:
+                xyz = spectrum_dict["x,y,z-position[mm]"]
+        # case: spectrum consists of single energy interval (typically used for quick tests)
+        if type(spectrum_dict["numEvts"]) in [str,int]:
+            cmd_string = " ".join([
+                abspathfile_execNEST_binary,
+                str(spectrum_dict["numEvts"]),
+                str(spectrum_dict["type_interaction"]),
+                str(spectrum_dict["E_min[keV]"]),
+                str(spectrum_dict["E_max[keV]"]),
+                str(spectrum_dict["field_drift[V/cm]"]),
+                str(xyz),
+                str(seed)])
+            cmd_list.append(cmd_string)
+        # case: spectrum consists of multiple energy intervals (typically used for actual spectra processing)
+        elif hasattr(spectrum_dict["numEvts"], "__len__"):
+            # checking validity of input 'spectrum_dict'
+            if len(spectrum_dict["numEvts"])==len(spectrum_dict["E_min[keV]"])==len(spectrum_dict["E_max[keV]"]):
+                if flag_verbose: print(f"\tinput 'spectrum_dict' appears valid")
+            else:
+                raise Exception(f"ERROR: len(spectrum_dict['numEvts'])==len(spectrum_dict['E_min[keV]'])==len(spectrum_dict['E_max[keV]'])")
+            # looping over all resulting 'cmd_strings'
+            for k, num in enumerate(spectrum_dict["numEvts"]):
+                cmd_string = " ".join([
+                    abspathfile_execNEST_binary,
+                    str(spectrum_dict["numEvts"][k]),
+                    str(spectrum_dict["type_interaction"]),
+                    str(spectrum_dict["E_min[keV]"][k]),
+                    str(spectrum_dict["E_max[keV]"][k]),
+                    str(spectrum_dict["field_drift[V/cm]"]),
+                    str(xyz),
+                    str(seed)])
+                cmd_list.append(cmd_string)
+
+    ### looping over all commands and executing them
+    for k, cmd_string in enumerate(cmd_list):
+
+        # executing the 'execNEST' C++ executable
+        cmd_print_string = "execNEST " +" ".join(list(cmd_string.split(" "))[1:])
+        if flag_verbose: print(f"{fn}: executing '$ {cmd_print_string}'")
+        cmd_return = subprocess.run(cmd_string, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout = cmd_return.stdout.decode('utf-8')
+        stderr = cmd_return.stderr.decode('utf-8')
+        if flag_print_stdout_and_stderr:
+            print(f"{fn}: 'stdout':")
+            print(stdout)
+            print(f"{fn}: 'stderr':")
+            print(stderr)
+        debug_dict = {
+            "stderr" : stderr,
+            "cmd_string" : cmd_string,}
+
+        # checking whether the specified detector was implemented correctly
+        if detector_dict != {}:
+            if flag_verbose: print(f"\tchecking implemented detector")
+            implemented_detector_list = []
+            for line in stderr.split("\n"):
+                line_list = list(line.split(" "))
+                if "ou" in line and "are" in line and "using" in line and "detector" in line:
+                    implemented_detector_list.append(line_list[-2])
+                else:
+                    continue
+            if len(implemented_detector_list) != 1:
+                raise Exception(f"ERROR: More than one potential detector implementations were found: {implemented_detector_list}. Maybe check your detector string search criteria.")
+            else:
+                implemented_detector = implemented_detector_list[0]
+                if implemented_detector != detector_name:
+                    raise Exception(f"ERROR: The implemented detector 'implemented_detector' does not match the one you specified 'detector_name'. It appears an error ocurred during installation.")
+            if flag_verbose: print(f"\timplemented detector = '{implemented_detector}' = '{detector_name}' = specified detector")
+
+        # searching for the NEST output header line
+        header_line_list = []
+        if flag_verbose: print(f"\tsearching for the output header line")
+        for line in stdout.split("\n"):
+            line_list = list(line.split("\t"))
+            if "Nph" in line_list:
+                header_line_list.append(line)
+            else:
+                continue
+        if len(header_line_list) != 1:
+            raise Exception(f"ERROR: More than one potential header line was found in the 'execNEST' C++ executable output were found: {header_line_list}. Maybe check your header line string search criteria.")
+        else:
+            header_line = header_line_list[0]
+            header_line_split = list(header_line.split("\t"))
+            if flag_verbose: print(f"\theader I: {header_line_split[:7]}")
+            if flag_verbose: print(f"\theader II: {header_line_split[7:]}")
+            dtype_list = []
+            for header in header_line_split:
+                if header in ["X,Y,Z [mm]"]:
+                    dtype_list.append((header, np.unicode_, 16))
+                else:
+                    dtype_list.append((header, np.float64))
+            execNEST_dtype = np.dtype(dtype_list)
+
+        # extracting the NEST output
+        if flag_verbose: print(f"{fn}: writing the NEST output into an ndarray")
+        this_nest_run_tuple_list = []
+        for line in stdout.split("\n"):
+            line_list = list(line.split("\t"))
+            if len(line_list) == 12 and "Nph" not in line:
+                execNEST_output_tuple = tuple(line_list)
+                this_nest_run_tuple_list.append(execNEST_output_tuple)
+            else:
+                continue
+        execNEST_output_tuple_list += this_nest_run_tuple_list
+        num = int(spectrum_dict["numEvts"][k]) if hasattr(spectrum_dict["numEvts"], "__len__") else int(spectrum_dict["numEvts"])
+        e_min = str(spectrum_dict["E_min[keV]"][k]) if hasattr(spectrum_dict["E_min[keV]"], "__len__") else int(spectrum_dict["E_min[keV]"])
+        e_max = str(spectrum_dict["E_max[keV]"][k]) if hasattr(spectrum_dict["E_max[keV]"], "__len__") else int(spectrum_dict["E_max[keV]"])
+        if len(this_nest_run_tuple_list) != num: raise Exception(f"This NEST run yielded {len(this_nest_run_tuple_list)} events instead of the specified {num} at E_min={e_min} and E_max={max}.")
+
+    ### casting the 'execNEST_output_tuple_list' into a ndarray
+    if flag_verbose: print(f"{fn}: casting 'execNEST_output_tuple_list' into numpy ndarray")
+    execNEST_output_ndarray = np.array(execNEST_output_tuple_list, execNEST_dtype)
+
+    return execNEST_output_ndarray
+
+
+
 
 
 ############################################

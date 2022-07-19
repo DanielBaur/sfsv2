@@ -1,17 +1,17 @@
-#ifndef darwin_test_detector_hh
-#define darwin_test_detector_hh 1
+#ifndef rndm_new_detector_hh
+#define rndm_new_detector_hh 1
 
 #include "VDetector.hh"
 
 using namespace std;
 
-class darwin_test_detector : public VDetector {
+class rndm_new_detector : public VDetector {
     public:
-        darwin_test_detector() {
+        rndm_new_detector() {
 
             Initialization();
         };
-        ~darwin_test_detector() override = default;
+        ~rndm_new_detector() override = default;
 
         void Initialization() override {
             g1                   =   1.9;
