@@ -10,6 +10,7 @@
 import subprocess
 import numpy as np
 import json
+import scipy.integrate as integrate
 
 
 
@@ -94,6 +95,178 @@ def write_dict_to_json(output_pathstring_json_file, save_dict):
         json.dump(save_dict, json_output_file, indent=4)
     return
 
+
+
+
+
+############################################
+### spectra computation
+############################################
+
+
+def give_spectrum(
+    # entering -1 yields the default values. (They are different for ER- and NR-events, so they are not directly
+    # used here). The user recieves a notification about the values used.
+    interaction_type ="ER", # ER or NR
+    bkg_array=[], # For ER: [nunubetabeta, pp_7Be]
+                # For NR: [nu_sum, nu_8B, nu_hep, nu_DSNB, nu_atm]
+    bin_size = -1, # in keV
+    min_energy = -1, # in keV
+    max_energy = -1, # in keV
+    flag = "midpoint", # specifies the method for integrating. Choose "midpoint" or "integrate".
+    y_t = 1e5, # runtime of the detector [y] * mass of the detector [t]. Is ignored when num_events > 0.
+    field_drift = 200, #in V/cm
+    num_events = -1, # if bigger than zero, y_t will be redefined to gurantee the given number of events.
+                     # Otherwise, the value is ignored.
+    file_prefix = "/home/catharina/Desktop/praktikum_freiburg_2022/resources/", #Path to spectrums saved as numpy arrays.
+    verbose=True
+):
+#Sanity check: plotting energy_bins and spectrum.
+#spectrum_dict =give_spectrum(interaction_type="ER",bkg_array=[1,0],num_events=1e6)
+#energy_bins =spectrum_dict["E_min[keV]"]
+#spectrum =  spectrum_dict["numEvts"]
+#plt.xlabel("Energy [keV]")
+#plt.ylabel("Number of events")
+#plt.xscale("log")
+#plt.yscale("log")
+#plt.scatter(energy_bins, spectrum, s=5)
+
+    NR_spectrum_name_list=["NR_spectrum_nu_sum", "NR_spectrum_nu_8B",
+                       "NR_spectrum_nu_hep", "NR_spectrum_nu_DSNB", "NR_spectrum_nu_atm"]
+    ER_spectrum_name_list=["ER_spectrum_nunubetabeta", "ER_spectrum_pp_7Be"]
+
+    spectrum_raw =[]
+    function_name = "give_spectrum"
+    if verbose: print(f"{function_name} running.")
+
+    assert interaction_type in ["NR", "ER"], "invalid interaction type, choose 'NR' or 'ER' (default)"
+    if interaction_type=="NR":
+        # Default options
+        if min_energy<0:
+            min_energy = 0.424
+            if verbose: print("Default lower energy-bound for NR-events used, min_energy = 0.424 keV")
+        if max_energy<0:
+            max_energy = 11.818
+            if verbose: print("Default upper energy-bound for NR-events used, max_energy = 11.818 keV")
+        if len(bkg_array)==0:
+            bkg_array=[1,0,0,0,0]
+            if verbose: print("Default NR-background used. The background consists of nu_sum only.")
+            if verbose: print("If you want to use a different background, enter for bkg_array = [nu_sum, nu_8B, nu_hep, nu_DSNB, nu_atm]")
+        if bin_size<0:
+            bin_size = 0.05
+            if verbose: print(f"Default bin_size={bin_size} keV for NR-events used.")
+
+        assert len(bkg_array)==5, "invalid number of parameters for NR-background, required 5, given "+str(len(bkg_array))
+
+        for file_name in NR_spectrum_name_list:
+            # loading the spectrum from a saved numpy-array.
+            spectrum_raw.append(np.load(file_prefix+file_name+".npy"))
+
+            # finding the minimum energy and the maximum energy allowed for later asserting
+            # the validity of given min_energy, max_energy.
+            if len(spectrum_raw)==1:
+                min_energy_allowed=spectrum_raw[-1]["Energy [keV]"][0]
+                max_energy_allowed=spectrum_raw[-1]["Energy [keV]"][-1]
+
+            if spectrum_raw[-1]["Energy [keV]"][0]<min_energy_allowed:
+                min_energy_allowed = spectrum_raw[-1]["Energy [keV]"][0]
+            if spectrum_raw[-1]["Energy [keV]"][-1]>max_energy_allowed:
+                max_energy_allowed = spectrum_raw[-1]["Energy [keV]"][-1]
+
+    else:
+        #Default options
+        if min_energy<0:
+            min_energy = 1
+            if verbose: print("Default lower energy-bound for ER-events used, min_energy = 1 keV")
+        if max_energy<0:
+            max_energy = 192
+            if verbose: print("Default upper energy-bound for ER-events used, max_energy = 192 keV")
+        if len(bkg_array)==0:
+            bkg_array=[1,1]
+            if verbose: print("Default ER-background used. It contains nunubetabeta and pp_7Be without scaling them further.")
+            if verbose: print("If you want to use a different background, enter for bkg_array = [nunubetabeta, pp_7Be]")
+        if bin_size<0:
+            bin_size = 1
+            if verbose: print(f"Default bin_size={bin_size} keV for ER-events used.")
+
+        assert len(bkg_array)==2, "invalid number of parameters for NR-background, required 2, given "+str(len(bkg_array))
+
+        for file_name in ER_spectrum_name_list:
+            # loading the spectrum from a saved numpy-array.
+            spectrum_raw.append(np.load(file_prefix+file_name+".npy"))
+
+            # finding the minimum energy and the maximum energy allowed for later asserting
+            # the validity of given min_energy, max_energy.
+            if len(spectrum_raw)==1:
+                min_energy_allowed=spectrum_raw[-1]["Energy [keV]"][0]
+                max_energy_allowed=spectrum_raw[-1]["Energy [keV]"][-1]
+            if spectrum_raw[-1]["Energy [keV]"][0]<min_energy_allowed:
+                min_energy_allowed = spectrum_raw[-1]["Energy [keV]"][0]
+            if spectrum_raw[-1]["Energy [keV]"][-1]>max_energy_allowed:
+                max_energy_allowed = spectrum_raw[-1]["Energy [keV]"][-1]
+
+    #print(min_energy_allowed, max_energy_allowed)
+
+    # Checking the soundness of given min_energy and max_energy.
+    assert min_energy<max_energy, "Invalid energy bounds. "
+    assert min_energy>min_energy_allowed, "Minimum energy too small, smallest allowed value "+str(min_energy_allowed)
+    assert max_energy<max_energy_allowed, "Maximum energy too big, biggest allowed value "+str(max_energy_allowed)
+
+    # creating energy-bins with width bin_size.
+    # bins are centered around the values in the energy_bins array.
+    energy_bins =[min_energy+bin_size/2]
+    spectrum =[]
+    while energy_bins[-1]+bin_size*3/2<=max_energy:
+        energy_bins.append(energy_bins[-1]+bin_size)
+
+
+    if verbose: print(f"Actual upper and lower energy bounds (change depends on bin_size): {energy_bins[0]-bin_size/2}, {energy_bins[-1]+bin_size/2}")
+
+    if num_events>0:
+        total_events = 0
+        for i in range(len(bkg_array)):
+            total_events+= bkg_array[i]* integrate.quad(lambda x:
+                    np.interp(x, spectrum_raw[i]["Energy [keV]"],
+                              spectrum_raw[i]["Rate [evts/y/t/keV]"]),energy_bins[0]-bin_size/2, energy_bins[-1]+bin_size/2)[0]
+        y_t = num_events/total_events
+
+    assert flag in ["midpoint", "integrate"], "Invalid flag, choose 'midpoint' or 'integrate'."
+
+    if flag=="midpoint":
+    # Simply takes the midpoint of the bin and plugs it into the rate-function.
+        for e in energy_bins:
+            rate=0
+            for i in range(len(bkg_array)):
+                rate+= bkg_array[i] * np.interp(e, spectrum_raw[i]["Energy [keV]"],
+                                                spectrum_raw[i]["Rate [evts/y/t/keV]"])
+            rate *= bin_size*y_t
+            spectrum.append(int(rate+0.5)) # round to the next integer value
+
+    if flag=="integrate":
+    # Integrates the rate-function over the whole bin. Computationally more expensive.
+        for e in energy_bins:
+            rate=0
+            for i in range(len(bkg_array)):
+                rate+= bkg_array[i] * integrate.quad(lambda x:
+                    np.interp(x, spectrum_raw[i]["Energy [keV]"],
+                              spectrum_raw[i]["Rate [evts/y/t/keV]"]), e-bin_size/2, e+bin_size/2)[0]
+            rate *= y_t
+            spectrum.append(int(rate+0.5)) # round to the next integer value
+
+    if verbose: print(str(sum(spectrum))+ " "+interaction_type+"-events generated.")
+    if verbose: print(f"number of bins: {len(energy_bins)}")
+
+    spectrum_dict = {
+            "numEvts" : spectrum,
+            "type_interaction" : interaction_type,
+            "E_min[keV]" : energy_bins,
+            "E_max[keV]" : energy_bins,
+            "field_drift[V/cm]" : field_drift,
+            "x,y,z-position[mm]" : "-1 -1 -1",
+            "seed" : 0
+        }
+
+    return spectrum_dict
 
 
 
@@ -188,7 +361,7 @@ def make_clean_reinstall(
         {
             "cmd" : "ls -la", # Keep this seemingly irrelevant first command in the list. If an error occurrs, then the program will raise an error instead of potentially damaging anything by executing 'make clean'.
             "stderr_default" : "", # Giving a string as default means the 'stderr' output has to exactly match the given string.
-            "stdout_default" : ["total", "daniel"], # Giving a list as default means that every list element has to appear in at least one line of the 'stdout' output.
+            "stdout_default" : ["total"], # Giving a list as default means that every list element has to appear in at least one line of the 'stdout' output.
         },
         {
             "cmd" : "make clean",
@@ -287,7 +460,7 @@ def install_detector_header_file(
     # modifying the extracted lines
     if flag_verbose : print(f"{fn}: modifying '{abspathfile_nest_execNEST_cpp}'")
     for k, line in enumerate(line_list):
-        if "include" in line and "etector" in line and ".hh" in line:
+        if ("include" in line and "etector" in line and ".hh" in line) or ("include" in line and "LUX" in line and ".hh" in line):
             new_line = f'#include "{detector_name}.hh"\n'
             line_list[k] = new_line
             if flag_verbose : print(f"\tinserted '{new_line[:-1]}'")
