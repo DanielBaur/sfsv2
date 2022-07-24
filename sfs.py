@@ -11,13 +11,16 @@ import subprocess
 import numpy as np
 import json
 import scipy.integrate as integrate
+from scipy.integrate import quad
+import math
+import matplotlib.pyplot as plt
 
 
 
 
 
 ############################################
-### general definitions
+### variable input
 ############################################
 
 
@@ -35,6 +38,7 @@ abspathfile_nest_installation_execNEST_bin = abspath_nest_installation_install +
 abspath_sfs_repo = "/home/daniel/Desktop/arbeitsstuff/sfs/github_repo_v2/"
 abspath_sfs_repo_detectors = abspath_sfs_repo +"detectors/"
 abspath_sfs_repo_spectra = abspath_sfs_repo +"spectra/"
+abspath_sfs_repo_resources = abspath_sfs_repo +"resources/"
 
 
 # darwin baseline detector design
@@ -82,6 +86,17 @@ darwin_baseline_detector_dict = {
 
 
 
+
+
+############################################
+### general definitions
+############################################
+
+
+wimp_eroi_kev_ee = [1.4, 10.6]
+wimp_eroi_kev_nr = [4.9, 40.9]
+
+
 # This function is used to retrieve a Python3 dictionary stored as a .json file.
 def get_dict_from_json(input_pathstring_json_file):
     with open(input_pathstring_json_file, "r") as json_input_file:
@@ -96,6 +111,91 @@ def write_dict_to_json(output_pathstring_json_file, save_dict):
     return
 
 
+def convert_detector_header_into_detector_dict(
+    abspathfile_detector_header,
+):
+
+    """
+    This function is used to extract the detector parameters from a detector header file and to write them into a detector dictionary.
+    """
+
+    # initialization
+    line_list = []
+    detector_dict = {}
+    parameter_list = [
+        "g1", "sPEres", "sPEthr", "sPEeff", "noiseBaseline[0]", "noiseBaseline[1]", "noiseBaseline[2]",
+        "noiseBaseline[3]", "P_dphe", "coinWind", "coinLevel", "numPMTs", "OldW13eV", "noiseLinear[0]",
+        "noiseLinear[1]", "g1_gas", "s2Fano", "s2_thr", "E_gas", "eLife_us", "T_Kelvin", "p_bar", "dtCntr",
+        "dt_min", "dt_max", "radius", "radmax", "TopDrift", "anode", "gate", "cathode", "PosResExp", "PosResBase"]
+
+    # reading the lines of the input file
+    with open(abspathfile_detector_header, 'r') as inputfile:
+        for line in inputfile:
+            line_list.append(line)
+
+    # extracting the detector parameters into 
+    for line in line_list:
+        if "=" in line and any([param in line for param in parameter_list]) and ";" in line:
+            line_mod = line
+            for k in range(0,50):
+                line_mod = line_mod.replace("  "," ")
+            line_mod_list = list(line_mod.split(" "))
+            extracted_parameter = line_mod_list[1]
+            extracted_value = line_mod_list[-1][:-2] if extracted_parameter=="OldW13eV" else float(line_mod_list[-1][:-2])
+            detector_dict.update({extracted_parameter:extracted_value})
+
+    return detector_dict
+
+
+def compute_g2_from_detector_configuration(
+    detector_dict, # dict, detector configuration
+):
+
+    """
+    This function is used to compute the g2 value of a specific detector configuration.
+    The comments on the official repo regarding the g2 calculation are outdated.
+    The code below was based on the NESTv2.3.9 computation of g2.
+    """
+
+    # initialization
+    EPS_GAS = 1.00126
+    EPS_LIQ = 1.85 # instead of 1.96 as in old NEST versions
+    NEST_AVO = 6.0221409e+23
+    molarMass = 131.293
+    alpha = 0.137
+    beta = 4.70e-18
+    gamma = 0
+    bara = detector_dict["p_bar"]
+    gasGap = detector_dict["anode"] -detector_dict["TopDrift"]
+    E_liq = detector_dict["E_gas"]/(EPS_LIQ/EPS_GAS)
+    T_Kelvin = detector_dict["T_Kelvin"]
+
+    # computing 'ExtEff'
+    em1 = 8.807528626640e4 -2.026247730928e3*T_Kelvin +1.747197309338e1*T_Kelvin**2 -6.692362929271e-2*T_Kelvin**3 +9.607626262594e-5*T_Kelvin**4
+    em2 = 5.074800229635e5 -1.460168019275e4*T_Kelvin +1.680089978382e2*T_Kelvin**2 -9.663183204468e-1*T_Kelvin**3 +2.778229721617e-3*T_Kelvin**4 -3.194249083426e-6*T_Kelvin**5
+    em3 = -4.659269964120e6 +1.366555237249e5*T_Kelvin -1.602830617076e3*T_Kelvin**2 +9.397480411915e-0*T_Kelvin**3 -2.754232523872e-2*T_Kelvin**4 +3.228101180588e-5*T_Kelvin**5
+    ExtEff = 1 - em1 *np.exp(-em2 *(E_liq**em3))
+    if ExtEff > 1:
+        ExtEff = 1
+    elif ExtEff < 0:
+        ExtEff = 0
+
+    # computing 'SE'
+    VaporP_bar = 10**(4.0519 - 667.16 / T_Kelvin)
+    p_Pa = bara *10**5
+    RidealGas = 8.31446261815324 # NEST.hh, Joules/mole/Kelvin
+    RealGasA = 0.4250 # NEST.hh, m^6*Pa/mol^2 or m^4*N/mol^2
+    RealGasB = 5.105e-5 # NEST.hh, m^3/mol
+    rho = 1.0 / ((RidealGas*T_Kelvin)**3 / (p_Pa*(RidealGas*T_Kelvin)**2 +RealGasA*p_Pa*p_Pa) +RealGasB) # Van der Waals equation, mol/m^3
+    rho = rho *molarMass * 1e-6
+    elYield = (alpha*detector_dict["E_gas"]*1e3 -beta*(NEST_AVO*rho/molarMass))*gasGap*0.1
+    SE = elYield *detector_dict["g1_gas"]
+
+    # computing 'g2'
+    g2 = ExtEff*SE
+    return g2
+
+
 
 
 
@@ -104,7 +204,210 @@ def write_dict_to_json(output_pathstring_json_file, save_dict):
 ############################################
 
 
-def give_spectrum(
+color_wimps_default = '#004A9B'
+color_nrs_default = '#004A9B'
+color_ers_default = '#C1002A'
+color_hep_default = "pink"
+color_pep_default = "cyan"
+color_pp_default = "orange"
+color_cno_default = "blue"
+color_be7_default = "green"
+color_b8_default = "red"
+color_atm_default = "purple"
+color_dsnb_default =  "brown"
+
+
+xenon_isotopic_composition = {
+    "124" : {
+        "m_u" : 123.905893, # atom mas in atomic mass units u
+        "abundance" : 0.00095, # isotopic abundance, not in percent
+    },
+    "126" : {
+        "m_u" : 125.904274,
+        "abundance" : 0.00089,
+    },
+    "128" : {
+        "m_u" : 127.9035313,
+        "abundance" : 0.01910,
+    },
+    "129" : {
+        "m_u" : 128.9047794,
+        "abundance" : 0.26401,
+    },
+    "130" : {
+        "m_u" : 129.9035080,
+        "abundance" : 0.04071,
+    },
+    "131" : {
+        "m_u" : 130.9050824,
+        "abundance" : 0.21232,
+    },
+    "132" : {
+        "m_u" : 131.9041535,
+        "abundance" : 0.26909,
+    },
+    "134" : {
+        "m_u" : 133.9053945,
+        "abundance" : 0.10436,
+    },
+    "136" : {
+        "m_u" : 135.907219,
+        "abundance" : 0.08857,
+    },
+}
+
+
+spectra_dict = {
+    "nr_wimps"		:   {
+        "latex_label"   : r"WIMPs",
+        "color"         : color_wimps_default,
+        "linestyle"     : "-",
+        "linewidth"     : 2,
+        "zorder"        : 2,
+    },
+    "nr_atm"		:   {
+        "latex_label"   : r"atm",
+        "color"         : color_atm_default,
+        "linestyle"     : "-",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "nr_dsnb"		:   {
+        "latex_label"   : r"DSNB",
+        "color"         : color_dsnb_default,
+        "linestyle"     : "-",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "nr_pp"		    :   {
+        "latex_label"   : r"pp",
+        "color"         : color_pp_default,
+        "linestyle"     : "-",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "nr_pep"		    :   {
+        "latex_label"   : r"pep",
+        "color"         : color_pep_default,
+        "linestyle"     : "-",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "nr_b8"		    :   {
+        "latex_label"   : r"$^{8}\mathrm{B}$",
+        "color"         : color_b8_default,
+        "linestyle"     : "-",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "nr_be7_384"	:   {
+        "latex_label"   : r"$^{7}\mathrm{Be}\,(384\,\mathrm{keV})$",
+        "color"         : color_be7_default,
+        "linestyle"     : "-",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "nr_be7_861"	:   {
+        "latex_label"   : r"$^{7}\mathrm{Be}\,(861\,\mathrm{keV})$",
+        "color"         : color_be7_default,
+        "linestyle"     : "--",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "nr_hep"		:   {
+        "latex_label"   : r"hep",
+        "color"         : color_hep_default,
+        "linestyle"     : "-",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "nr_o15"		:   {
+        "latex_label"   : r"$^{15}\mathrm{O}$",
+        "color"         : color_cno_default,
+        "linestyle"     : "-",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "nr_f17"		:   {
+        "latex_label"   : r"$^{17}\mathrm{F}$",
+        "color"         : color_cno_default,
+        "linestyle"     : "-.",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "nr_n13"		:   {
+        "latex_label"   : r"$^{13}\mathrm{N}$",
+        "color"         : color_cno_default,
+        "linestyle"     : "--",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "er_pp"		    :   {
+        "latex_label"   : r"pp",
+        "color"         : color_pp_default,
+        "linestyle"     : "-",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "er_be7_384"	:   {
+        "latex_label"   : r"$^{7}\mathrm{Be}\,(384\,\mathrm{keV})$",
+        "color"         : color_be7_default,
+        "linestyle"     : "-",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "er_be7_861"	:   {
+        "latex_label"   : r"$^{7}\mathrm{Be}\,(861\,\mathrm{keV})$",
+        "color"         : color_be7_default,
+        "linestyle"     : "--",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "er_o15"		:   {
+        "latex_label"   : r"$^{15}\mathrm{O}$",
+        "color"         : color_cno_default,
+        "linestyle"     : "--",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "er_n13"		:   {
+        "latex_label"   : r"$^{13}\mathrm{N}$",
+        "color"         : color_cno_default,
+        "linestyle"     : "-",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+    "er_pep"		:   {
+        "latex_label"   : r"pep",
+        "color"         : color_pep_default,
+        "linestyle"     : "-",
+        "linewidth"     : 1,
+        "zorder"        : 1,
+    },
+}
+
+
+def convert_grabbed_csv_to_ndarray(
+    abspathfile_grabbed_csv,
+):
+    """
+    This function is used to convert a .csv file generated with 'WebPlotDigitizer' ('https://automeris.io/WebPlotDigitizer/', accessed: 24th July 2022) into a numpy structured array.
+    """
+    data_tuple_list = []
+    with open(abspathfile_grabbed_csv, 'r') as input_file:
+        for k, line in enumerate(input_file):
+            line_list = list(line.split(","))
+            x = line_list[0]
+            y = line_list[1]
+            data_tuple_list.append((x, y))
+    dtype = np.dtype([
+        ("x_data", np.float64),
+        ("y_data", np.float64),])
+    ndarray = np.array(data_tuple_list, dtype)
+    return ndarray
+
+
+def give_spectrum_dict(
     # entering -1 yields the default values. (They are different for ER- and NR-events, so they are not directly
     # used here). The user recieves a notification about the values used.
     interaction_type ="ER", # ER or NR
@@ -267,6 +570,714 @@ def give_spectrum(
         }
 
     return spectrum_dict
+
+
+def calculate_wimp_induced_nuclear_recoil_rate_dru(
+    # main parameters
+    e_nr_kev, # float, nuclear recoil energy in keV
+    mass_wimp_gev = 40.0, # float, hypothetical WIMP mass in GeV/c^2
+    cross_section_wimp_proton_cm2 = 1e-47, # float, hypothetical WIMP-proton cross-section in cm^2
+    energy_threshold_kev = 2.0, # float, minimum nuclear recoil energy in keV_nr detectable with detector (required for the integration of the Maxwellian velocity distribution)
+    wimp_dark_matter_mass_density_gevcm3 = 0.3, # float, dark matter energy density in GeV/c^2/cm^3
+    velocity_escape_kmps = 544.0, # float, galactic escape velocity in km/s
+    velocity_circular_kmps = 220, # float, earth's circular velocity in km/s
+    mass_target_nucleus_u = 130.9050824, # float, mass of target neucleus in amu
+    mass_proton_u = 1.00727647, # float, proton mass in amu
+    mass_number_target_nucleus = 131, # int, atomic mass number of target nucleus
+    # flags
+    flag_verbose = False,
+):
+
+    """
+    This functions is used to calculate the WIMP recoil spectrum based on the standard Lewin Smith ansatz.
+    """
+
+    # conversion to SI units
+    mass_target_nucleus = mass_target_nucleus_u *1.66053906660 *10**(-27) # conversion to kg
+    mass_proton = mass_proton_u *1.66053906660 *10**(-27) # conversion to kg
+    mass_wimp = (mass_wimp_gev *10**9 *1.60218 *10**(-19))/((3*10**8)**2) # conversion to kg
+    energy_threshold = energy_threshold_kev *1000 *1.60218 *10**(-19) # conversion to Joule
+    e_nr_j = e_nr_kev *1000 *1.60218 *10**(-19) # conversion to Joule
+    cross_section_wimp_proton = cross_section_wimp_proton_cm2 *(1/10000) # conversion to m^2
+    wimp_dark_matter_mass_density = wimp_dark_matter_mass_density_gevcm3 *(1000000) # conversion to GeV/m^3
+    velocity_escape = velocity_escape_kmps *1000 # conversion to m/s
+    velocity_circular = velocity_circular_kmps *1000 # conversion to m/s
+
+    # derived quantities
+    number_of_target_nuclei = 1000/mass_target_nucleus # number of target nuclei within 1 tonne of liquid xenon
+    redmass_wimp_proton = (mass_proton *mass_wimp)/(mass_proton +mass_wimp)
+    redmass_wimp_nucleus = (mass_wimp *mass_target_nucleus)/(mass_wimp +mass_target_nucleus)
+    velocity_min = np.sqrt((mass_target_nucleus *energy_threshold)/(2 *(redmass_wimp_nucleus**2)))
+    velocity_min = np.sqrt((mass_target_nucleus *e_nr_j)/(2 *(redmass_wimp_nucleus**2)))
+
+    # integrated spin-independent WIMP nucleus cross-section
+    cross_section_integrated_wimp_nucleus_spin_independent = mass_number_target_nucleus**2 *(redmass_wimp_nucleus/redmass_wimp_proton)**2 *cross_section_wimp_proton
+
+    # defining the nuclear form factor (Helm model: https://iopscience.iop.org/article/10.1088/0253-6102/55/6/21/pdf)
+    def nuclear_form_factor(energy_nuclear_recoil):
+        # recoil energy -> momentum transfer
+        p = np.sqrt(2*mass_target_nucleus *(energy_nuclear_recoil*1000 *1.60218 *10**(-19)))
+        q = p/(1.0545718*10**(-34))
+        r_n = 1.2*mass_number_target_nucleus**(1/3)*(1/10**(15)) # nuclear radius in m
+        # calculating substeps
+        qr_n = q*r_n
+        s = 1*(1/10**(15)) # skin thickness in m
+        qs = q*s
+        #a = 3*(np.sin(math.radians(qr_n))-qr_n*np.cos(math.radians(qr_n)))
+        a = 3*(np.sin(qr_n)-qr_n*np.cos(qr_n))
+        b = (qr_n)**3
+        c = np.exp(-((q*s)**2/2))
+        return a/b *c
+
+    # defining the Maxwellian WIMP velocity distribution
+    def wimp_velocity_distribution(
+        v, # float, velocity in km/s
+        v_circ = velocity_circular):
+        v_0 = np.sqrt(2/3) *v_circ
+        j = 4 *np.pi *v**2
+        f = np.sqrt((np.pi *v_0**2))**3
+        exp = np.exp(-((v**2)/(v_0**2)))
+        return (j/f) *exp
+
+    # differential WIMP-nucleus cross-section
+    def cross_section_differential_wimp_nucleus(v, energy_nuclear_recoil):
+        return (mass_target_nucleus *cross_section_integrated_wimp_nucleus_spin_independent *nuclear_form_factor(energy_nuclear_recoil=energy_nuclear_recoil)**2) /(2 *redmass_wimp_nucleus**2 *v**2)
+
+    # integrating the product of Maxwellian velocity distribution and differential WIMP-nucleus corss-section
+    def integrand_function(v, energy_nuclear_recoil):
+        return wimp_velocity_distribution(v) *v *cross_section_differential_wimp_nucleus(v, energy_nuclear_recoil=energy_nuclear_recoil)
+    # NOTE: You might ask why there is a factor v**3 instead of just v in the integrand function.
+    # The reason is that you are integrating over f(v) in three spatial dimensions.
+    # Hence (using spherical coordinates) you also pick up a factor of r**2 *sin(theta).
+    # Integrating sin(theta) over dtheta and dphi gives you a factor of 4*np.pi and then you still have to additionally integrate r**2.
+
+    # coputing the final product
+    scaling_factor = (60 *60 *24 *365) *(1/((1/1000) *1.60218 *10**(+19))) # conversion from events/s/J into events/ (t x y x keV)
+    differential_recoil_rate_dru = \
+        scaling_factor \
+        *number_of_target_nuclei \
+        *(wimp_dark_matter_mass_density/mass_wimp_gev) \
+        *quad(
+            integrand_function,
+            velocity_min,
+            velocity_escape +velocity_circular,
+            args=(e_nr_kev)
+        )[0]
+
+    return differential_recoil_rate_dru
+
+
+def maxwellian_velocity_distribution(
+    v, # float, velocity in m/s
+    v_0, # float, mean velocity in m/s
+):
+    """
+    This function resembles a Maxwellian distribution function.
+    """
+    j = 4 *np.pi *v**2
+    f = np.sqrt((np.pi *v_0**2))**3
+    exp = np.exp(-((v**2)/(v_0**2)))
+    return (j/f) *exp
+
+
+def calculate_nuclear_form_factor_helm_approximation(
+    nuclear_recoil_energy_j,
+    target_nucleus_mass_kg,
+    target_nucleus_mass_number,
+):
+    """
+    This function is used to calculate the Helm approximation of the nuclear form factor.
+    See: https://iopscience.iop.org/article/10.1088/0253-6102/55/6/21/pdf
+    """
+    # recoil energy -> momentum transfer
+    p = np.sqrt(2*target_nucleus_mass_kg *nuclear_recoil_energy_j)
+    q = p/(1.0545718*10**(-34))
+    r_n = 1.2*target_nucleus_mass_number**(1/3)*(1/10**(15)) # nuclear radius in m
+    # calculating substeps
+    qr_n = q*r_n
+    s = 1*(1/10**(15)) # skin thickness in m
+    qs = q*s
+    #a = 3*(np.sin(math.radians(qr_n))-qr_n*np.cos(math.radians(qr_n)))
+    a = 3*(np.sin(qr_n)-qr_n*np.cos(qr_n))
+    b = (qr_n)**3
+    c = np.exp(-((q*s)**2/2))
+    return a/b *c
+
+
+def calculate_differential_spin_independent_wimp_nucleus_cross_section(
+    v, # float, relative WIMP-nucleus velocity in m/s
+    nuclear_recoil_energy_j, # float, resulting nuclear recoil energy in Joule
+    target_nucleus_mass_kg, # float
+    target_nucleus_mass_number, # int
+    reduced_mass_wimp_nucleus_kg, # float
+    reduced_mass_wimp_proton_kg, # float
+    wimp_proton_cross_section_m2, # float
+):
+    """
+    This function resembles the energy-dependent differential spin-independent WIMP-nucleus cross-section.
+    """
+    fraction = target_nucleus_mass_kg/(2 *reduced_mass_wimp_nucleus_kg**2 *v**2)
+    integrated_spin_independent_wimp_nucleon_cross_section = target_nucleus_mass_number**2 *(reduced_mass_wimp_nucleus_kg/reduced_mass_wimp_proton_kg)**2 *wimp_proton_cross_section_m2
+    helm_form_factor = calculate_nuclear_form_factor_helm_approximation(
+        nuclear_recoil_energy_j = nuclear_recoil_energy_j,
+        target_nucleus_mass_kg = target_nucleus_mass_kg,
+        target_nucleus_mass_number = target_nucleus_mass_number)
+    return  fraction *integrated_spin_independent_wimp_nucleon_cross_section *helm_form_factor**2
+
+
+def wimp_recoil_rate_integrand_function(
+    v,
+    nuclear_recoil_energy_j,
+    wimp_proton_cross_section_m2,
+    target_nucleus_mass_kg,
+    target_nucleus_mass_number,
+    reduced_mass_wimp_nucleus_kg,
+    reduced_mass_wimp_proton_kg,
+    earth_circular_velocity_mps):
+    """
+    This function resembles the integrand of XXX.
+    """
+    f = maxwellian_velocity_distribution(
+        v = v,
+        v_0 = np.sqrt(2/3)*earth_circular_velocity_mps)
+    del_sigma_del_enr = calculate_differential_spin_independent_wimp_nucleus_cross_section(
+        v = v,
+        nuclear_recoil_energy_j = nuclear_recoil_energy_j,
+        target_nucleus_mass_kg = target_nucleus_mass_kg,
+        target_nucleus_mass_number = target_nucleus_mass_number,
+        reduced_mass_wimp_nucleus_kg = reduced_mass_wimp_nucleus_kg,
+        reduced_mass_wimp_proton_kg = reduced_mass_wimp_proton_kg,
+        wimp_proton_cross_section_m2 = wimp_proton_cross_section_m2)
+    return f *v *del_sigma_del_enr
+
+
+def calculate_wimp_induced_nuclear_recoil_rate_events_t_y_kev(
+    # main parameters
+    nuclear_recoil_energy_kev, # float, nuclear recoil energy in keV
+    wimp_mass_gev, # float, hypothetical WIMP mass in GeV/c^2
+    wimp_proton_cross_section_cm2, # float, hypothetical WIMP-proton cross-section in cm^2
+    # detector material
+    target_nucleus_mass_u = 130.9050824, # float, mass of target neucleus in amu
+    target_nucleus_mass_number = 131, # int, atomic mass number of target nucleus
+    # model parameters
+    dark_matter_energy_density_gev_cm3 = 0.3, # float, dark matter energy density in GeV/c^2/cm^3
+    milky_way_escape_velocity_kmps = 544.0, # float, galactic escape velocity in km/s
+    earth_circular_velocity_kmps = 220, # float, earth's circular velocity in km/s
+    # flags
+    flag_verbose = False,):
+
+    """
+    This function is used to calculate the differential WIMP recoil spectrum based on the standard Lewin Smith ansatz.
+    """
+
+    # conversion to SI units
+    nuclear_recoil_energy_j = nuclear_recoil_energy_kev *1000 *1.60218 *10**(-19)
+    target_nucleus_mass_kg = target_nucleus_mass_u *1.66053906660 *10**(-27) # conversion to kg
+    proton_mass_kg = 1.00727647 *1.66053906660 *10**(-27) # conversion to kg
+    wimp_mass_kg = (wimp_mass_gev *10**9 *1.60218 *10**(-19))/((3*10**8)**2) # conversion to kg
+    wimp_proton_cross_section_m2 = wimp_proton_cross_section_cm2 *(1/10000) # conversion to m^2
+    dark_matter_energy_density_gev_m3 = dark_matter_energy_density_gev_cm3 *(1000000) # conversion to GeV/m^3
+    earth_circular_velocity_mps = earth_circular_velocity_kmps *1000 # conversion to m/s
+    milky_way_escape_velocity_mps = earth_circular_velocity_kmps *1000 # conversion to m/s
+
+    # calculating derived quantities
+    target_nuclei_in_one_tonne = 1000/target_nucleus_mass_kg
+    reduced_mass_wimp_proton_kg = (proton_mass_kg *wimp_mass_kg)/(proton_mass_kg +wimp_mass_kg)
+    reduced_mass_wimp_nucleus_kg = (wimp_mass_kg *target_nucleus_mass_kg)/(wimp_mass_kg +target_nucleus_mass_kg)
+    unit_scaling_factor = (60 *60 *24 *365) *(1/((1/1000) *1.60218 *10**(+19))) # conversion from events/s/J into events/y/keV
+    v_min = np.sqrt((target_nucleus_mass_kg *nuclear_recoil_energy_j)/(2 *(reduced_mass_wimp_nucleus_kg**2)))
+    #v_min = 0
+    v_max = milky_way_escape_velocity_mps +earth_circular_velocity_mps
+
+    # coputing the final product
+    factor = target_nuclei_in_one_tonne *dark_matter_energy_density_gev_m3 *(1/wimp_mass_gev) *unit_scaling_factor
+    integral = quad(
+        wimp_recoil_rate_integrand_function,
+        v_min,
+        v_max,
+        args = (
+            nuclear_recoil_energy_j,
+            wimp_proton_cross_section_m2,
+            target_nucleus_mass_kg,
+            target_nucleus_mass_number,
+            reduced_mass_wimp_nucleus_kg,
+            reduced_mass_wimp_proton_kg,
+            earth_circular_velocity_mps,))[0]
+    return factor *integral
+
+
+
+
+
+
+
+###  WIMPs  #######################################
+# This function is used to generate a WIMP recoil spectrum.
+def gen_wimp_recoil_spectrum(
+    # main parameters
+    mass_wimp_gev = 40.0, # in GeV/c^2
+    cross_section_wimp_proton_cm2 = 1e-47, # in cm^2
+    mass_detector_target_t = 40, # in tonnes
+    time_exposure_y = 5, # in years
+    e_nr_kev = None, # default is 'None'
+    # parameters
+    energy_threshold_kev = 2, # in keV_nr
+    wimp_dark_matter_mass_density_gevcm3 = 0.3, # in GeV/c^2/cm^3
+    velocity_escape_kmps = 544, # in km/s
+    velocity_circular_kmps = 220, # in km/s
+    mass_target_nucleus_u = 130.9050824, # in amu
+    mass_proton_u = 1.00727647, # in amu
+    mass_number_target_nucleus = 131,
+    # output parameters
+    energy_nuclear_recoil_min = 0, # in keV_nr
+    energy_nuclear_recoil_max = 60, # in keV_nr
+    number_of_bins_or_samples = 120,
+    # flags
+    flag_output = "histogram"
+):
+
+    ### model calculation
+    # conversion to SI units
+    mass_target_nucleus = mass_target_nucleus_u *1.66053906660 *10**(-27) # conversion to kg
+    mass_proton = mass_proton_u *1.66053906660 *10**(-27) # conversion to kg
+    mass_detector_target = mass_detector_target_t *1000 # conversion to kg
+    time_exposure = time_exposure_y *365 *24 *60 *60 # conversion to s
+    mass_wimp = (mass_wimp_gev *10**9 *1.60218 *10**(-19))/((3*10**8)**2) # conversion to kg
+    energy_threshold = energy_threshold_kev *1000 *1.60218 *10**(-19) # conversion to Joule
+    cross_section_wimp_proton = cross_section_wimp_proton_cm2 *(1/10000) # conversion to m^2
+    wimp_dark_matter_mass_density = wimp_dark_matter_mass_density_gevcm3 *(1000000) # conversion to GeV/m^3
+    velocity_escape = velocity_escape_kmps *1000 # conversion to m/s
+    velocity_circular = velocity_circular_kmps *1000 # conversion to m/s
+    # derived quantities
+    number_of_target_nuclei = mass_detector_target/mass_target_nucleus
+    redmass_wimp_proton = (mass_proton *mass_wimp)/(mass_proton +mass_wimp)
+    redmass_wimp_nucleus = (mass_wimp *mass_target_nucleus)/(mass_wimp +mass_target_nucleus)
+    velocity_min = np.sqrt((mass_target_nucleus *energy_threshold)/(2 *(redmass_wimp_nucleus**2)))
+    # integrated spin-independent WIMP nucleus cross-section
+    cross_section_integrated_wimp_nucleus_spin_independent = mass_number_target_nucleus**2 *(redmass_wimp_nucleus/redmass_wimp_proton)**2 *cross_section_wimp_proton
+    # nuclear form factors (Helm model: https://iopscience.iop.org/article/10.1088/0253-6102/55/6/21/pdf)
+    def nuclear_form_factor(energy_nuclear_recoil):
+        # recoil energy -> momentum transfer
+        p = np.sqrt(2*mass_target_nucleus *(energy_nuclear_recoil*1000 *1.60218 *10**(-19)))
+        q = p/(1.0545718*10**(-34))
+        r_n = 1.2*mass_number_target_nucleus**(1/3)*(1/10**(15)) # nuclear radius in m
+        # calculating substeps
+        qr_n = q*r_n
+        s = (1/10**(15)) # skin thickness in m
+        qs = q*s
+        #a = 3*(np.sin(math.radians(qr_n))-qr_n*np.cos(math.radians(qr_n)))
+        a = 3*(np.sin(qr_n)-qr_n*np.cos(qr_n))
+        b = (qr_n)**3
+        c = np.exp(-((q*s)**2/2))
+        return a/b *c
+    # wimp velocity distribution
+    def wimp_velocity_distribution(v):
+        v_0 = np.sqrt(2/3) *velocity_circular
+        j = 4 *np.pi *v**2
+        f = np.sqrt((np.pi *v_0**2))**3
+        exp = np.exp(-((v**2)/(v_0**2)))
+        return (j/f) *exp
+    # differential WIMP-nucleus cross-section
+    def cross_section_differential_wimp_nucleus(v, energy_nuclear_recoil):
+        return (mass_target_nucleus *cross_section_integrated_wimp_nucleus_spin_independent *nuclear_form_factor(energy_nuclear_recoil=energy_nuclear_recoil)**2) /(2 *redmass_wimp_nucleus**2 *v**2)
+    # integrand function
+    # NOTE: You might ask why there is a factor v**3 instead of just v in the integrand function.
+    # The reason is that you are integrating over f(v) in three spatial dimensions.
+    # Hence (using spherical coordinates) you also pick up a factor of r**2 *sin(theta).
+    # Integrating sin(theta) over dtheta and dphi gives you a factor of 4*np.pi and then you still have to additionally integrate r**2.
+    def integrand_function(v, energy_nuclear_recoil):
+        return wimp_velocity_distribution(v) *v *cross_section_differential_wimp_nucleus(v, energy_nuclear_recoil=energy_nuclear_recoil)
+    # differential recoil rate in DRU (i.e. events/kg/d/keV)
+    def differential_recoil_rate_dru(energy_nuclear_recoil):
+        scaling_factor = (1/(mass_detector_target)) *(60 *60 *24) *(1/((1/1000) *1.60218 *10**(+19))) # conversion from events/s/J into events/kg/d/keV
+        return scaling_factor *number_of_target_nuclei *(wimp_dark_matter_mass_density/mass_wimp_gev) *quad(integrand_function, velocity_min, velocity_escape +velocity_circular, args=(energy_nuclear_recoil))[0]
+    # differential recoil rate adapted to detector settings (i.e. events/detector_mass/exposure_time/keV)
+    def differential_recoil_rate_det(energy_nuclear_recoil):
+        scaling_factor = time_exposure *(1/((1/1000) *1.60218 *10**(+19))) # conversion from events/s/J into events/kg/d/keV
+        return scaling_factor *number_of_target_nuclei *(wimp_dark_matter_mass_density/mass_wimp_gev) *quad(integrand_function, velocity_min, velocity_escape +velocity_circular, args=(energy_nuclear_recoil))[0]
+
+    ### generating output
+    # returning absolute rates by integrating the differential energy spectrum; i.e. energy bin centers, absolute counts per energy bin
+    if flag_output == "histogram":
+        binwidth = (energy_nuclear_recoil_max -energy_nuclear_recoil_min)/number_of_bins_or_samples
+        energy_bin_centers = np.linspace(start=energy_nuclear_recoil_min+0.5*binwidth, stop=energy_nuclear_recoil_max-0.5*binwidth, num=number_of_bins_or_samples, endpoint=True)
+        counts_per_energy_bin = np.zeros_like(energy_bin_centers)
+        for i in range(len(energy_bin_centers)):
+            counts_per_energy_bin[i] = quad(differential_recoil_rate_det, energy_bin_centers[i]-0.5*binwidth, energy_bin_centers[i]+0.5*binwidth)[0]
+        return energy_bin_centers, counts_per_energy_bin
+    # returning the differential recoil spectrum in DRU (events/kg/d/keV)
+    elif flag_output == "rate":
+        energy_nuclear_recoil_list = np.linspace(start=energy_nuclear_recoil_min, stop=energy_nuclear_recoil_max, num=number_of_bins_or_samples, endpoint=True)
+        diff_rate_list = np.zeros_like(energy_nuclear_recoil_list)
+        for i in range(len(energy_nuclear_recoil_list)):
+            diff_rate_list[i] = differential_recoil_rate_dru(energy_nuclear_recoil=energy_nuclear_recoil_list[i])
+        return energy_nuclear_recoil_list, diff_rate_list
+    # returning a single value of the differential recoil spectrum in DRU
+    elif flag_output == "single_dru_value" and e_nr_kev != None:
+        return differential_recoil_rate_dru(energy_nuclear_recoil=e_nr_kev)
+    else:
+        print("invalid input: 'flag_output'")
+        return
+
+
+def diffratefunct(
+    e_nr_kev,
+    a,
+    abundance,
+    target_mass_u,
+    wimp_mass_gev,
+    cross_section_cm2,
+):
+
+    """
+    This function resembles the 'diffratefunct' function translated from a C++ script into Python to compute the differential WIMP rate in events per t x y x keV.
+    """
+    
+    N0 = 6.02214199e26 # Avogadro Constant
+    c = 299792458.0 # vacuum speed of light [m/s]
+    mp = 0.9382728 # mass of the proton [GeV/c^2]
+    u = 0.93149401 # Atomic mass unit [GeV/c^2]
+    # WIMP halo constants
+    v_0 = 220000.0 # real mean velocity of DM Maxewellian distribution [m/s]
+    v_esc = 544000.0 # real escape velocity of DM [m/s]
+    v_E = 232000.0 # real mean velocity of Earth [m/s]
+    rho_DM = 0.3 # local DM density [GeV/cm^3]
+    # conversion factors
+    fmtoGeV = 1.0/0.197327 # conversion from fm to 1/GeV
+    keVtoGeV = 1e-6 # conversion from keV to GeV
+    daytos = 60.0*60.0*24.0 # conversion from day to seconds
+    stoday = 1.0/daytos # conversion from s to day
+    mtocm = 1e2 # conversion from m to cm
+    cm2topbarn = 1e36 # conversion from cm^2 to picobarn
+    pbarntocm2 = 1e-36 # conversion from picobarn to cm^2
+    epsilon = 1e-10
+    # nuclear constants for form factor
+    a0 = 0.52 #fm
+    s = 0.9  #fm
+    
+    # reduced masses
+    m_wimp = wimp_mass_gev
+    sig = cross_section_cm2
+    munucwimp =m_wimp*u*target_mass_u/(m_wimp+u*target_mass_u)
+    mupwimp = m_wimp*mp/(m_wimp+mp)
+
+    # mean kinetic energy of WIMP
+    E0 = 0.5*1.e6*m_wimp*(v_0/c)**2 #   // 1/2 mv^2 and 1e6 is conversion from GeV to keV	
+    # kinematic factor
+    r = 4.0*m_wimp*u*target_mass_u / (m_wimp+u*target_mass_u)**2	
+
+    # Formfactor -----------------------------------------------------------------
+    # variables
+    c0 = 1.23 * a**(1/3) - 0.6 # fm
+    rn = np.sqrt(c0**2 +7.0/3.0 *math.pi**2 *a0*2 -5.0*s**2)
+    # FF definition
+    F = 3.0*(np.sin(np.sqrt(2.0*u*target_mass_u*e_nr_kev*keVtoGeV)*rn*fmtoGeV)-(np.sqrt(2.0*u*target_mass_u*e_nr_kev*keVtoGeV)*rn*fmtoGeV) *np.cos(np.sqrt(2.0*u*target_mass_u*e_nr_kev*keVtoGeV)*rn*fmtoGeV))/   (np.sqrt(2.0*u*target_mass_u*e_nr_kev*keVtoGeV)*rn*fmtoGeV)**3*np.exp(-1.0/2.0*  (np.sqrt(2.0*u*target_mass_u*e_nr_kev*keVtoGeV)*s*fmtoGeV)**2)		
+
+    # Velocity integral -----------------------------------------------------------
+    # minimum velocity to generate recoil Er=e_nr_kev
+    vmin = np.sqrt(e_nr_kev/(E0*r))*v_0
+    # k-factor for normaization
+    k1_k0 = 1.0/(math.erf(v_esc/v_0)-2.0/np.sqrt(math.pi)*v_esc/v_0*np.exp(-v_esc**2/v_0**2))
+
+    # velocity integral
+    # -- separation in the different energy bins see Savage et al, JCAP  04 (2009) 010, or Sebastian's PhD thesis
+    # -- if the standard L&S approach should be used, the first if clause should be changed to "if (0.0<vmin && vmin<=(v_esc+v_E))"
+    #    and evergything else should be removed
+    if vmin > 0 and vmin <= (v_esc+v_E):
+        velocityint = (np.sqrt(math.pi)/4.0*v_0/v_E*(math.erf((vmin+v_E)/v_0)-math.erf((vmin-v_E)/v_0))-np.exp(-(v_esc/v_0)**2))
+    else:
+        velocityint = 0
+        #raise Exception(f"vim = {vmin}")
+
+    # uncorrected Rate
+    R0  =2.0/np.sqrt(math.pi)*N0/target_mass_u*rho_DM/m_wimp*pbarntocm2*a**2*munucwimp**2/mupwimp**2*v_0*mtocm*daytos*sig*cm2topbarn
+
+    # differential rate
+    diffrateval = R0*abundance*k1_k0*(1.0/(E0*r))*velocityint *F**2
+
+    return diffrateval
+
+
+def give_flat_spectrum(
+    # entering -1 yields the default values. (They are different for ER- and NR-events, so they are not directly
+    # used here). The user recieves a notification about the values used if verbose=True.
+    interaction_type ="ER", # ER or NR
+    bin_size = -1, # in keV
+    min_energy = -1, # in keV
+    max_energy = -1, # in keV
+    field_drift = 200, #in V/cm
+    num_events = 1e6, # Total number of events. Number of events per bin depends on this parameter
+    verbose=True
+):
+    function_name = "give_flat_spectrum"
+
+    if verbose: print(f"{function_name} running.")
+    assert interaction_type in ["NR", "ER"], "invalid interaction type, choose 'NR' or 'ER' (default)"
+
+    if interaction_type=="NR":
+        # Default options
+        if min_energy<0:
+            min_energy = 0.424
+            if verbose: print("Default lower energy-bound for NR-events used, min_energy = 0.424 keV")
+        if max_energy<0:
+            max_energy = 11.818
+            if verbose: print("Default upper energy-bound for NR-events used, max_energy = 11.818 keV")
+        if bin_size<0:
+            bin_size = 0.05
+            if verbose: print(f"Default bin_size={bin_size} keV for NR-events used.")
+    else:
+        #Default options
+        if min_energy<0:
+            min_energy = 1
+            if verbose: print("Default lower energy-bound for ER-events used, min_energy = 1 keV")
+        if max_energy<0:
+            max_energy = 192
+            if verbose: print("Default upper energy-bound for ER-events used, max_energy = 192 keV")
+        if bin_size<0:
+            bin_size = 1
+            if verbose: print(f"Default bin_size={bin_size} keV for ER-events used.")
+
+    assert min_energy<max_energy, "Invalid energy bounds. "
+
+    # creating energy-bins with width bin_size.
+    # bins are centered around the values in the energy_bins array.
+    energy_bins =[min_energy+bin_size/2]
+    spectrum =[]
+    while energy_bins[-1]+bin_size*3/2<=max_energy:
+        energy_bins.append(energy_bins[-1]+bin_size)
+
+    if verbose: print(f"Actual upper and lower energy bounds (change depends on bin_size): {energy_bins[0]-bin_size/2}, {energy_bins[-1]+bin_size/2}")
+
+    events_per_bin = int(num_events/len(energy_bins)+0.5)
+
+    assert events_per_bin>0, "Please enter for num_events a value >= {len(energy_bins)} to avoid empty bins. (NEST hates that and will come to haunt you if you don't.)"
+
+    spectrum=np.ones(len(energy_bins), dtype = int)*events_per_bin
+
+    if verbose:
+        print(f"number of bins: {len(energy_bins)}")
+        print(f"Events per bin: {events_per_bin}")
+        print(f"total number of events: {len(energy_bins)*events_per_bin}")
+
+    spectrum_dict = {
+            "numEvts" : spectrum,
+            "type_interaction" : interaction_type,
+            "E_min[keV]" : energy_bins,
+            "E_max[keV]" : energy_bins,
+            "field_drift[V/cm]" : field_drift,
+            "x,y,z-position[mm]" : "-1 -1 -1",
+            "seed" : 0
+        }
+
+    return spectrum_dict
+
+
+"""
+
+###################### EXAMPLE FOR TESTING ##################################
+
+import matplotlib.pyplot as plt
+
+spectrum_dict =give_flat_spectrum(interaction_type="NR",num_events=1e6)
+energy_bins =spectrum_dict["E_min[keV]"]
+spectrum =  spectrum_dict["numEvts"]
+plt.xlabel("Energy [keV]")
+plt.ylabel("Number of events")
+plt.xscale("log")
+plt.yscale("log")
+plt.scatter(energy_bins, spectrum, s=5)
+
+
+"""
+
+
+def gen_spectrum_plot(
+    spectra_list, # list of 'spectra_dict' keys, e.g., ["nr_wimps", "nr_atm", "nr_dsnb"]
+    abspath_spectra_data = abspath_sfs_repo_resources,
+    # spectra parameters
+    wimp_mass_gev = 50, # float, hypothetical WIMP mass in GeV
+    wimp_nucleon_cross_section_cm2 = 1*10**(-47), # float,hypothetical WIMP-nucleon cross-section in cm^2
+    wimp_computation_method = ["default", "old", "cpp"][2],
+    # plot parameters
+    plot_fontsize_axis_label = 11,
+    plot_figure_size_x_inch = 5.670,
+    plot_aspect_ratio = 9/16,
+    plot_log_y_axis = False,
+    plot_log_x_axis = False,
+    plot_xlim = [],
+    plot_ylim = [],
+    plot_x_axis_units = ["kev", "kev_nr", "kev_ee"][0],
+    plot_legend = True,
+    plot_legend_bbox_to_anchor = [0.45, 0.63, 0.25, 0.25],
+    plot_legend_labelspacing = 0.5,
+    plot_legend_fontsize = 9,
+    # flags
+    flag_output_abspath_list = [],
+    flag_output_filename = "spectrum_plot.png",
+    flag_shade_wimp_eroi = [],
+    flag_verbose = False,
+):
+
+    """
+    This function is used to generate a plot with all spectra specified in 'spectra_list'.
+    The type of the 0th element in 'spectra_list' determines the type of spectrum this function generates:
+        type(spectra_list[0])==str ---> compute the differential rate spectrum for each entry
+        type(spectra_list[0])=='spectrum_dict' ---> display the actual spectrum histogram fed into 'execNEST' (as generated with 'give_spectrum_dict')
+    """
+
+    # initialization
+    fn = "gen_spectrum_plot"
+    if type(spectra_list[0])==str:
+        mode = "compute_dru"
+    elif type(spectra_list[0])==dict:
+        mode = "spectrum_dict"
+        raise Exception(f"{fn}: This still needs to be implemented.")
+    else:
+        raise Exception()
+    if flag_verbose: print(f"{fn}: initializing with 'mode'='{mode}''")
+
+    # setting up the canvas
+    if flag_verbose: print(f"{fn}: setting up canvas and axes")
+    fig = plt.figure(
+        figsize = [plot_figure_size_x_inch, plot_figure_size_x_inch*plot_aspect_ratio],
+        dpi = 150,
+        constrained_layout = True) 
+
+    # axes
+    ax1 = fig.add_subplot()
+    if plot_x_axis_units == "kev":
+        ax1.set_xlabel(r"recoil energy, $E$ / $\mathrm{keV}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_ylabel(r"differential event rate $\frac{\mathrm{d}R}{\mathrm{d}E}$ / $\mathrm{\frac{events}{t\times y\times keV}}$", fontsize=plot_fontsize_axis_label)
+    elif plot_x_axis_units == "kev_nr":
+        ax1.set_xlabel(r"nuclear recoil energy, $E_{\mathrm{nr}}$ / $\mathrm{keV}_{\mathrm{nr}}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_ylabel(r"differential event rate $\frac{\mathrm{d}R}{\mathrm{d}E_{\mathrm{nr}}}$ / $\mathrm{\frac{events}{t\times y\times keV}}$", fontsize=plot_fontsize_axis_label)
+    elif plot_x_axis_units == "kev_ee":
+        ax1.set_xlabel(r"electronic recoil energy, $E_{\mathrm{ee}}$ / $\mathrm{keV}_{\mathrm{ee}}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_ylabel(r"differential event rate, $\frac{\mathrm{d}R}{\mathrm{d}E_{\mathrm{ee}}}$ / $\mathrm{\frac{events}{t\times y\times keV}}$", fontsize=plot_fontsize_axis_label)
+    elif mode=="spectrum_dict":
+        ax1.set_ylabel(r"events per energy bin", fontsize=plot_fontsize_axis_label)
+    if plot_xlim != []: ax1.set_xlim(plot_xlim)
+    if plot_ylim != []: ax1.set_ylim(plot_ylim)
+    if plot_log_y_axis: ax1.set_yscale('log')
+    if plot_log_x_axis: ax1.set_xscale('log')
+
+    ### case: mode=="compute_dru"
+    if mode=="compute_dru":
+        x_data_size = 301
+        if plot_log_x_axis:
+            if plot_xlim==[]:
+                x_data_recoil_energy_kev = np.logspace(start=-2, stop=+2, num=x_data_size, endpoint=True)
+            else:
+                exp_lower = int(list(f"{plot_xlim[0]:.2E}".split("E"))[-1])-1
+                exp_upper = int(list(f"{plot_xlim[1]:.2E}".split("E"))[-1])+1
+                x_data_recoil_energy_kev = np.logspace(start=exp_lower, stop=exp_upper, num=x_data_size, endpoint=True)
+        else:
+            if plot_xlim==[]:
+                x_data_recoil_energy_kev = np.linspace(start=0.01, stop=100.01, num=x_data_size, endpoint=True)
+            else:
+                x_data_recoil_energy_kev =  np.linspace(start=plot_xlim[0], stop=plot_xlim[1], num=x_data_size, endpoint=True)
+        for k, spectrum_name in enumerate(spectra_list):
+
+            # WIMP spectra are computed analytically
+            if spectrum_name=="nr_wimps":
+                wimp_recoil_rate_per_isotope = []
+                for a in [*xenon_isotopic_composition]:
+                    if wimp_computation_method=="default":
+                        y_data_recoil_rate_events_t_y_kev = [xenon_isotopic_composition[a]["abundance"]*calculate_wimp_induced_nuclear_recoil_rate_events_t_y_kev(
+                            nuclear_recoil_energy_kev = x,
+                            wimp_mass_gev = wimp_mass_gev,
+                            wimp_proton_cross_section_cm2 = wimp_nucleon_cross_section_cm2,
+                            target_nucleus_mass_u = xenon_isotopic_composition[a]["m_u"],
+                            target_nucleus_mass_number = int(a),
+                        ) for x in x_data_recoil_energy_kev]
+                    elif wimp_computation_method=="old":
+                        y_data_recoil_rate_events_t_y_kev = [xenon_isotopic_composition[a]["abundance"]*calculate_wimp_induced_nuclear_recoil_rate_dru(
+                            e_nr_kev = x,
+                            mass_wimp_gev = wimp_mass_gev,
+                            cross_section_wimp_proton_cm2 = wimp_nucleon_cross_section_cm2,
+                            energy_threshold_kev = 0.0,
+                            mass_target_nucleus_u = xenon_isotopic_composition[a]["m_u"],
+                            mass_number_target_nucleus = int(a),
+                        ) for x in x_data_recoil_energy_kev]
+                    elif wimp_computation_method=="cpp":
+                        y_data_recoil_rate_events_t_y_kev = [1000*365*diffratefunct(
+                            e_nr_kev = x,
+                            a = int(a),
+                            abundance = xenon_isotopic_composition[a]["abundance"],
+                            target_mass_u = xenon_isotopic_composition[a]["m_u"],
+                            wimp_mass_gev = wimp_mass_gev,
+                            cross_section_cm2 = wimp_nucleon_cross_section_cm2,
+                        ) for x in x_data_recoil_energy_kev]
+                    wimp_recoil_rate_per_isotope.append(y_data_recoil_rate_events_t_y_kev)
+                y_data_recoil_rate_events_t_y_kev = [sum([y[l] for y in wimp_recoil_rate_per_isotope]) for l in range(len(x_data_recoil_energy_kev))]
+                legend_label = r"WIMPs ($m_{\chi}=" +f"{wimp_mass_gev:.0f}" +r"\,\mathrm{GeV},\,\sigma_{p,\chi}^{\mathrm{SI}}=" +f"{wimp_nucleon_cross_section_cm2:.2E}" +r"$)"
+                legend_label = r"WIMPs"
+
+            # non-WIMP spectra are interpolated from digitized recoil spectra
+            else:
+                digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_data +spectrum_name +".csv")
+                y_data_recoil_rate_events_t_y_kev = [  np.interp(x, digitized_spectrum_ndarray["x_data"], digitized_spectrum_ndarray["y_data"])  for x in x_data_recoil_energy_kev]
+                legend_label = spectra_dict[spectrum_name]["latex_label"]
+
+            # plotting the current spectrum
+            ax1.plot(
+                x_data_recoil_energy_kev,
+                y_data_recoil_rate_events_t_y_kev,
+                label = legend_label,
+                linestyle = spectra_dict[spectrum_name]["linestyle"],
+                linewidth = spectra_dict[spectrum_name]["linewidth"],
+                zorder = spectra_dict[spectrum_name]["zorder"],
+                color = spectra_dict[spectrum_name]["color"],)
+
+    # data generation
+    #y_data_events_per_t_y_kev_marc = []
+    #for k in range(len(x_data_e_nr_kev)):
+    #    testval = 0
+    #    for l, comp_dict in enumerate(sfs.isotopic_composition_natural_xenon):
+    #        testval += sfs.diffratefunct(
+    #            e_nr_kev = x_data_e_nr_kev[k],
+    #            a = comp_dict["a"],
+    #            abundance = comp_dict["relative_abundance_perc"]/100,
+    #            target_mass_u = comp_dict["m_amu"],
+    #            wimp_mass_gev = wimp_mass_gev,
+    #            cross_section_cm2 = sigma_cm2,
+    #        )
+    #    y_data_events_per_t_y_kev_marc.append(testval)
+
+    # shading the WIMP EROI
+    if flag_shade_wimp_eroi != []:
+        ax1.axvspan(
+            flag_shade_wimp_eroi[0],
+            flag_shade_wimp_eroi[1],
+            alpha = 0.2,
+            linewidth = 0,
+            color = "grey",
+            zorder = -1)
+
+    # legend
+    if plot_legend : ax1.legend(
+        loc = "center",
+        labelspacing = plot_legend_labelspacing,
+        fontsize = plot_legend_fontsize,
+        bbox_to_anchor = plot_legend_bbox_to_anchor,
+        bbox_transform = ax1.transAxes,)
+
+    # saving
+    plt.show()
+    for abspath in flag_output_abspath_list:
+        fig.savefig(abspath +flag_output_filename)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -681,19 +1692,220 @@ def execNEST(
 
 
 
+
+
+
 ############################################
 ### ER/NR discrimination
 ############################################
 
 
+def calc_er_nr_discrimination_line(
+    er_spectrum,
+    nr_spectrum,
+
+    g1, #photoelectrons per photon
+    g2, # photons per electron
+    w, #eV
+    min_energy, #in keV
+    max_energy, # in keV
+    bin_size, #in keV, not exceeding max_energy
+    nr_acceptance = 0.30, # portion of the nr-spectrum below the discrimination line
+    approx_depth = 10,# only integers allowed
+    # upper bound for errors in the discrimination line is
+    # ~ 2**(-approx_depth-1) * (max(nr_spectrum[S2]/nr_spectrum[S1]) - min(nr_spectrum[S2]/nr_spectrum[S1]))
+    verbose =True,
+    ):
+    #generate energy bins of size energy_bin_size and an array of the bin edges (energy_bin_edges).
+    #Bins are centerd around the entries in the energy_bins array.
+
+    if verbose: print("calc_er_nr_discrimination_line running.")
+    energy_bins = [min_energy + bin_size/2]
+    bin_edges = [min_energy]
+    while energy_bins[-1]+bin_size*3/2<=max_energy:
+        energy_bins.append(energy_bins[-1]+bin_size)
+        bin_edges.append(bin_edges[-1]+bin_size)
+    bin_edges.append(bin_edges[-1]+bin_size)
 
 
+    dtype = np.dtype([("S2/S1", np.float64)]) #dtype for nr_energies and er_energies numpy arrays
 
+    total_er_remaining = 0
+    total_er = 0
+    total_nr_below_discr_line = 0
+    total_nr = 0
+
+    #x-data and y-data for the discrimination line
+    dl_x_data=[] # cS1/g1 [ph]
+    dl_y_data=[] # cS1/cS2
+
+    #array contain reconstructed energies for ER- and NR-events (but only accurate for ER)
+    energy_er=w*(er_spectrum_corr["S1_3Dcor [phd]"]/g1 +er_spectrum_corr["S2_3Dcorr [phd]"]/g2)/1000
+
+    energy_nr=w*(nr_spectrum_corr["S1_3Dcor [phd]"]/g1 +nr_spectrum_corr["S2_3Dcorr [phd]"]/g2)/1000
+
+    #plt.hist(energy_er)
+    #plt.hist(energy_nr)
+
+    nr_below_dl=np.array([])
+    nr_below_dl.dtype = nr_spectrum.dtype
+    for bin_index in range(len(energy_bins)):
+
+        #filter the ER- and NR-events that lie in the current energy-bin.
+        er_bin_data =er_spectrum[(energy_er> bin_edges[bin_index])&(energy_er<bin_edges[bin_index+1])]
+
+        nr_bin_data =nr_spectrum[(energy_nr> bin_edges[bin_index])&(energy_nr<bin_edges[bin_index+1])]
+
+
+        total_er += len(er_bin_data)
+        total_nr += len(nr_bin_data)
+
+        total_nr_events = len(nr_bin_data["S2_3Dcorr [phd]"])
+        threshold_nr_events = total_nr_events*nr_acceptance
+
+        # calculates s2/s1 for every event in the bin
+        nr_y = nr_bin_data["S2_3Dcorr [phd]"]/nr_bin_data["S1_3Dcor [phd]"]
+        er_y = er_bin_data["S2_3Dcorr [phd]"]/er_bin_data["S1_3Dcor [phd]"]
+        nr_y.dtype =dtype
+        er_y.dtype = dtype
+
+        if len(nr_y)==0 or len(er_y)==0:
+            #if verbose:
+                #print(f"energy bin [{bin_edges[bin_index]}, {bin_edges[bin_index+1]}] is empty.")
+                #print(len(er_bin_data), len(nr_bin_data))
+            continue
+
+        lower_bound = min(nr_y["S2/S1"])
+        upper_bound = max(nr_y["S2/S1"])
+        guess = binary_search(lower_bound, upper_bound,
+                                 lambda x: len(nr_y[ nr_y["S2/S1"]<=x]),threshold_nr_events, 0, approx_depth)
+        total_er_remaining += len(er_y[er_y["S2/S1"]<= guess])
+
+
+        total_nr_below_discr_line += len(nr_y[ nr_y["S2/S1"]<=guess])
+
+        nr_below_dl = np.append(nr_below_dl, nr_bin_data[nr_y["S2/S1"]<=guess])
+        #append guess and bin
+
+        dl_x_data.append(1000*bin_edges[bin_index]/w/(1+g1/g2*guess)) #bin_edges are in keV, formula
+                                                                 # E = w(S1/g1 + S2/g2) is in eV
+        dl_x_data.append(1000*bin_edges[bin_index+1]/w/(1+g1/g2*guess))
+
+        dl_y_data.append(guess)
+        dl_y_data.append(guess)
+
+    er_rejection = total_er_remaining/total_er
+    if verbose:
+        print("Total number of ER-events:",total_er)
+        print("Total number of NR-events:",total_nr)
+        print("Input NR-acceptance:", nr_acceptance)
+        print("Actual NR-acceptance:", total_nr_below_discr_line/total_nr)
+        print("Ratio of ER-Events left below the discrimination line:",er_discrimination)
+
+    output_dict = {
+        "dl_x_data_s1_over_g1": dl_x_data,
+        "dl_y_data_s2_over_s1": dl_y_data,
+        "nr_acceptance":nr_acceptance,
+        "er_rejection": er_rejection,
+        "nr_below_dl": nr_below_dl,
+    }
+
+    return output_dict
+
+
+def binary_search(lower_bound, upper_bound, eval_func, threshold,current_depth, max_depth):
+    # function finds recursively a good guess for eval_func(guess) = threshold.
+    # eval_func must be monotonically increasing.
+
+    assert upper_bound>=lower_bound, "upper_bound should be greater than lower_bound."
+    assert max_depth == int(max_depth), "max_depth should be an integer."
+
+    guess = (upper_bound+lower_bound)/2
+    # if maximum depth is reached, stop searching and return current best guess.
+    if current_depth>= max_depth:
+           return guess
+
+    if eval_func(guess)>threshold:
+        # now guess is new upper bound, lower_bound stays
+        return binary_search(lower_bound, guess,  eval_func, threshold, current_depth+1, max_depth)
+
+    elif eval_func(guess)<threshold:
+        # now guess ist new lower bound, upper_bound stays
+        return binary_search( guess, upper_bound, eval_func, threshold, current_depth+1, max_depth)
+
+    elif eval_func(guess) == threshold:
+        # This will propably never happen, but whatever.
+        # if the current guess fits the threshold, stop.
+        return guess
+
+"""
+# detector parameters
+g1=0.12
+g1_gas = 0.1
+g2 = 20 #rough estimate
+w=13.6 #eV
+
+
+nr_spectrum = sfs.execNEST(
+    spectrum_dict = give_flat_spectrum(interaction_type="NR", num_events =1e6, min_energy =0.5,
+                                       max_energy= 10,verbose=False),
+    detector_dict = {
+        "g1" : g1,
+        "g1_gas" : g1_gas,
+    },
+    detector_name="random_test_detector2",
+    flag_verbose = False,
+)
+
+er_spectrum = sfs.execNEST(
+    spectrum_dict = give_flat_spectrum(interaction_type="ER", num_events =1e6, min_energy = 1,
+                                       max_energy=50, verbose=False),
+    detector_dict = {
+        "g1" : g1,
+        "g1_gas" : g1_gas,
+    },
+    detector_name="random_test_detector2",
+    flag_verbose = False,
+)
+
+dl_dict = calc_er_nr_discrimination_line(er_spectrum_corr, nr_spectrum_corr, g1, g2,
+    w, min_energy=1,max_energy=10,bin_size=0.2, nr_acceptance=0.3)
+
+
+# plotting NR- and ER-events, NR-events below the discrimination line, and the discrimination line
+dl_x_data=dl_dict["dl_x_data_s1_over_g1"]
+dl_y_data=dl_dict["dl_y_data_s2_over_s1"]
+nr_below_dl = dl_dict["nr_below_dl"]
+
+alpha = 0.05
+s=1
+plt.figure(figsize=(10,10))
+plt.yscale("log")
+plt.xlabel("cS1/g1 [phd]")
+plt.ylabel("cS2/cS1")
+plt.xlim([0,400])
+plt.scatter(nr_spectrum_corr["S1_3Dcor [phd]"]/g1, nr_spectrum_corr["S2_3Dcorr [phd]"]/nr_spectrum_corr["S1_3Dcor [phd]"],
+            alpha=alpha,s=s, label="NR")
+plt.scatter(er_spectrum_corr["S1_3Dcor [phd]"]/g1, er_spectrum_corr["S2_3Dcorr [phd]"]/er_spectrum_corr["S1_3Dcor [phd]"],
+            alpha=alpha,s=s, label="ER")
+plt.scatter(nr_below_dl["S1_3Dcor [phd]"]/g1, nr_below_dl["S2_3Dcorr [phd]"]/nr_below_dl["S1_3Dcor [phd]"],
+            alpha=alpha,s=s, label="NR below dl")
+plt.plot(dl_x_data, dl_y_data, label="discriminiation line", c="black")
+plt.legend()
+
+
+"""
 
 
 ############################################
 ### likelihood stuff
 ############################################
+
+
+
+
+
+
 
 
 
