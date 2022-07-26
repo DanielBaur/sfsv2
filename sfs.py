@@ -111,6 +111,14 @@ def write_dict_to_json(output_pathstring_json_file, save_dict):
     return
 
 
+def compute_array_sum(array_list):
+    array_sum = np.zeros_like(array_list[0])
+    for k in range(len(array_sum)):
+        for array in array_list:
+            array_sum[k] += array[k]
+    return array_sum
+
+
 def convert_detector_header_into_detector_dict(
     abspathfile_detector_header,
 ):
@@ -253,136 +261,6 @@ xenon_isotopic_composition = {
     "136" : {
         "m_u" : 135.907219,
         "abundance" : 0.08857,
-    },
-}
-
-
-spectra_dict = {
-    "nr_wimps"		:   {
-        "latex_label"   : r"WIMPs",
-        "color"         : color_wimps_default,
-        "linestyle"     : "-",
-        "linewidth"     : 2,
-        "zorder"        : 2,
-    },
-    "nr_atm"		:   {
-        "latex_label"   : r"atm",
-        "color"         : color_atm_default,
-        "linestyle"     : "-",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "nr_dsnb"		:   {
-        "latex_label"   : r"DSNB",
-        "color"         : color_dsnb_default,
-        "linestyle"     : "-",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "nr_pp"		    :   {
-        "latex_label"   : r"pp",
-        "color"         : color_pp_default,
-        "linestyle"     : "-",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "nr_pep"		    :   {
-        "latex_label"   : r"pep",
-        "color"         : color_pep_default,
-        "linestyle"     : "-",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "nr_b8"		    :   {
-        "latex_label"   : r"$^{8}\mathrm{B}$",
-        "color"         : color_b8_default,
-        "linestyle"     : "-",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "nr_be7_384"	:   {
-        "latex_label"   : r"$^{7}\mathrm{Be}\,(384\,\mathrm{keV})$",
-        "color"         : color_be7_default,
-        "linestyle"     : "-",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "nr_be7_861"	:   {
-        "latex_label"   : r"$^{7}\mathrm{Be}\,(861\,\mathrm{keV})$",
-        "color"         : color_be7_default,
-        "linestyle"     : "--",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "nr_hep"		:   {
-        "latex_label"   : r"hep",
-        "color"         : color_hep_default,
-        "linestyle"     : "-",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "nr_o15"		:   {
-        "latex_label"   : r"$^{15}\mathrm{O}$",
-        "color"         : color_cno_default,
-        "linestyle"     : "-",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "nr_f17"		:   {
-        "latex_label"   : r"$^{17}\mathrm{F}$",
-        "color"         : color_cno_default,
-        "linestyle"     : "-.",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "nr_n13"		:   {
-        "latex_label"   : r"$^{13}\mathrm{N}$",
-        "color"         : color_cno_default,
-        "linestyle"     : "--",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "er_pp"		    :   {
-        "latex_label"   : r"pp",
-        "color"         : color_pp_default,
-        "linestyle"     : "-",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "er_be7_384"	:   {
-        "latex_label"   : r"$^{7}\mathrm{Be}\,(384\,\mathrm{keV})$",
-        "color"         : color_be7_default,
-        "linestyle"     : "-",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "er_be7_861"	:   {
-        "latex_label"   : r"$^{7}\mathrm{Be}\,(861\,\mathrm{keV})$",
-        "color"         : color_be7_default,
-        "linestyle"     : "--",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "er_o15"		:   {
-        "latex_label"   : r"$^{15}\mathrm{O}$",
-        "color"         : color_cno_default,
-        "linestyle"     : "--",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "er_n13"		:   {
-        "latex_label"   : r"$^{13}\mathrm{N}$",
-        "color"         : color_cno_default,
-        "linestyle"     : "-",
-        "linewidth"     : 1,
-        "zorder"        : 1,
-    },
-    "er_pep"		:   {
-        "latex_label"   : r"pep",
-        "color"         : color_pep_default,
-        "linestyle"     : "-",
-        "linewidth"     : 1,
-        "zorder"        : 1,
     },
 }
 
@@ -806,6 +684,42 @@ def calculate_wimp_induced_nuclear_recoil_rate_events_t_y_kev(
     return factor *integral
 
 
+def calculate_wimp_induced_nuclear_recoil_rate_in_natural_xenon_events_t_y_kev(
+    # main parameters
+    nuclear_recoil_energy_kev, # float, nuclear recoil energy in keV
+    wimp_mass_gev, # float, hypothetical WIMP mass in GeV/c^2
+    wimp_proton_cross_section_cm2, # float, hypothetical WIMP-proton cross-section in cm^2
+    # detector material
+    xenon_isotopic_composition_dict = xenon_isotopic_composition, # dict, isotopic composition of natural xenon
+    # model parameters
+    dark_matter_energy_density_gev_cm3 = 0.3, # float, dark matter energy density in GeV/c^2/cm^3
+    milky_way_escape_velocity_kmps = 544.0, # float, galactic escape velocity in km/s
+    earth_circular_velocity_kmps = 220, # float, earth's circular velocity in km/s
+    # flags
+    flag_verbose = False,):
+
+    """
+    This function is used to calculate the differential WIMP recoil spectrum based on the standard Lewin Smith ansatz in natural xenon.
+    """
+
+    diffrate_events_t_y_kev = 0
+    for a_str in [*xenon_isotopic_composition_dict]:
+        diffrate_events_t_y_kev += xenon_isotopic_composition_dict[a_str]["abundance"] *calculate_wimp_induced_nuclear_recoil_rate_events_t_y_kev(
+            nuclear_recoil_energy_kev = nuclear_recoil_energy_kev,
+            wimp_mass_gev = wimp_mass_gev,
+            wimp_proton_cross_section_cm2 = wimp_proton_cross_section_cm2,
+            target_nucleus_mass_u = xenon_isotopic_composition_dict[a_str]["m_u"],
+            target_nucleus_mass_number = int(a_str),
+            dark_matter_energy_density_gev_cm3 = dark_matter_energy_density_gev_cm3,
+            milky_way_escape_velocity_kmps = milky_way_escape_velocity_kmps,
+            earth_circular_velocity_kmps = earth_circular_velocity_kmps,
+            flag_verbose = flag_verbose,) 
+
+    return diffrate_events_t_y_kev
+
+
+
+
 
 
 
@@ -1090,6 +1004,7 @@ plt.scatter(energy_bins, spectrum, s=5)
 
 """
 
+
 spectrum_dict_default_dict = {
     "nr_wimps"		                            : {
         "latex_label"                           : r"WIMPs",
@@ -1109,15 +1024,201 @@ spectrum_dict_default_dict = {
             "flag_verbose"                      : False,
         },
     },
+    "nr_wimps_nat_xe"                           : {
+        "latex_label"                           : r"WIMPs",
+        "color"                                 : color_wimps_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 2,
+        "zorder"                                : 2,
+        "differential_rate_computation"         : calculate_wimp_induced_nuclear_recoil_rate_in_natural_xenon_events_t_y_kev,
+        "differential_rate_parameters"          : {
+            "wimp_mass_gev"                     : 50,
+            "wimp_proton_cross_section_cm2"     : 1e-47,
+            "xenon_isotopic_composition_dict"   : xenon_isotopic_composition,
+            "dark_matter_energy_density_gev_cm3": 0.3,
+            "milky_way_escape_velocity_kmps"    : 544.0,
+            "earth_circular_velocity_kmps"      : 220,
+            "flag_verbose"                      : False,
+        },
+    },
     "nr_atm"		                            : {
         "latex_label"                           : r"atm",
         "color"                                 : color_atm_default,
         "linestyle"                             : "-",
         "linewidth"                             : 1,
         "zorder"                                : 1,
-        "differential_rate_computation"         : "extrapolation_from_file",
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "nr_dsnb"		                            : {
+        "latex_label"                           : r"DSNB",
+        "color"                                 : color_dsnb_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "nr_pp"		                                : {
+        "latex_label"                           : r"pp",
+        "color"                                 : color_pp_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "nr_pep"		                            : {
+        "latex_label"                           : r"pep",
+        "color"                                 : color_pep_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "nr_b8"		                                : {
+        "latex_label"                           : r"$^{8}\mathrm{B}$",
+        "color"                                 : color_b8_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "nr_be7_384"	                            : {
+        "latex_label"                           : r"$^{7}\mathrm{Be}\,(384\,\mathrm{keV})$",
+        "color"                                 : color_be7_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "nr_be7_861"	                            : {
+        "latex_label"                           : r"$^{7}\mathrm{Be}\,(861\,\mathrm{keV})$",
+        "color"                                 : color_be7_default,
+        "linestyle"                             : "--",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "nr_hep"		                            : {
+        "latex_label"                           : r"hep",
+        "color"                                 : color_hep_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "nr_o15"		                            : {
+        "latex_label"                           : r"$^{15}\mathrm{O}$",
+        "color"                                 : color_cno_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "nr_f17"		                            : {
+        "latex_label"                           : r"$^{17}\mathrm{F}$",
+        "color"                                 : color_cno_default,
+        "linestyle"                             : "-.",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "nr_n13"		                            : {
+        "latex_label"                           : r"$^{13}\mathrm{N}$",
+        "color"                                 : color_cno_default,
+        "linestyle"                             : "--",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "er_pp"		                                : {
+        "latex_label"                           : r"pp",
+        "color"                                 : color_pp_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "er_be7_384"	                            : {
+        "latex_label"                           : r"$^{7}\mathrm{Be}\,(384\,\mathrm{keV})$",
+        "color"                                 : color_be7_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "er_be7_861"	                            : {
+        "latex_label"                           : r"$^{7}\mathrm{Be}\,(861\,\mathrm{keV})$",
+        "color"                                 : color_be7_default,
+        "linestyle"                             : "--",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "er_o15"		                            : {
+        "latex_label"                           : r"$^{15}\mathrm{O}$",
+        "color"                                 : color_cno_default,
+        "linestyle"                             : "--",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "er_n13"		                            : {
+        "latex_label"                           : r"$^{13}\mathrm{N}$",
+        "color"                                 : color_cno_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
+    },
+    "er_pep"		                            : {
+        "latex_label"                           : r"pep",
+        "color"                                 : color_pep_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "interpolation_from_file",
     },
 }
+
+
+# adding combination profiles
+spectrum_dict_default_dict.update({
+    "er_be7"		                            : {
+        "latex_label"                           : r"$^{7}\mathrm{Be}$",
+        "color"                                 : color_be7_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "spectrum_sum",
+        "constituent_spectra_list"               : ["er_be7_384", "er_be7_861"],
+    },
+    "er_cno"		                            : {
+        "latex_label"                           : r"CNO",
+        "color"                                 : color_cno_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "spectrum_sum",
+        "constituent_spectra_list"               : ["er_o15", "er_n13"],
+    },
+    "nr_cno"		                            : {
+        "latex_label"                           : r"CNO",
+        "color"                                 : color_cno_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "spectrum_sum",
+        "constituent_spectra_list"               : ["nr_o15", "nr_n13", "nr_f17"],
+    },
+    "nr_be7"		                            : {
+        "latex_label"                           : r"$^{7}\mathrm{Be}$",
+        "color"                                 : color_be7_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "spectrum_sum",
+        "constituent_spectra_list"              : ["nr_be7_384", "nr_be7_861"],
+    },
+})
 
 
 def give_spectrum_dict(
@@ -1152,6 +1253,13 @@ def give_spectrum_dict(
     spectrum_dict = spectrum_dict_default_values[spectrum_name].copy()
     print(f"\tupdating 'spectrum_dict' with specified keyword arguments")
     spectrum_dict.update({
+        "recoil_energy_kev_list"    : recoil_energy_kev_list,
+        "exposure_t_y" : exposure_t_y,
+        "num_events" : num_events,
+        "seed" : seed,
+        "drift_field_v_cm" : drift_field_v_cm,
+        "xyz_pos_mm" : xyz_pos_mm,
+        "flag_verbose" : flag_verbose,
         "flag_spectrum_type"        : flag_spectrum_type,
     })
     for k in [*kwargs]:
@@ -1161,59 +1269,92 @@ def give_spectrum_dict(
         else:
             spectrum_dict.update({k:kwargs[k]})
 
-    # inferring the differential rate computation method
-    print(f"{fn}: assessing differential rate computation method")
-    if spectrum_dict["differential_rate_computation"] == "extrapolation_from_file":
-        digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_files +spectrum_name +".csv")
-        differential_rate_function = np.interp
-        differential_rate_param_dict = {"xp" : digitized_spectrum_ndarray["x_data"], "fp" : digitized_spectrum_ndarray["y_data"]}
-    elif callable(spectrum_dict["differential_rate_computation"]):
-        differential_rate_function = spectrum_dict["differential_rate_computation"]
-        differential_rate_param_dict = spectrum_dict["differential_rate_parameters"]
+    # case: specified spectrum is sum of many constituent profiles ---> recursively compute the 'spectrum_dict' for every constituent dictionary
+    if spectrum_dict["differential_rate_computation"] == "spectrum_sum":
+        constituent_spectrum_dict_list = []
+        # recursively computing the 'spectrum_dict's for all constituent spectra
+        for constituent_spectrum_name in spectrum_dict["constituent_spectra_list"]:
+            constituent_spectrum_dict_list.append(give_spectrum_dict(
+                spectrum_name = constituent_spectrum_name,
+                recoil_energy_kev_list = recoil_energy_kev_list,
+                abspath_spectra_files = abspath_spectra_files,
+                exposure_t_y = exposure_t_y,
+                num_events = num_events,
+                seed = seed,
+                drift_field_v_cm = drift_field_v_cm,
+                xyz_pos_mm = xyz_pos_mm,
+                flag_spectrum_type = flag_spectrum_type,
+                flag_verbose = flag_verbose,
+                spectrum_dict_default_values = spectrum_dict_default_values,
+                **kwargs,
+            ))
+        # summing the number of entries of the individual constituent dicts
+        #spectrum_dict = constituent_spectrum_dict_list[0].copy()
+        if spectrum_dict["flag_spectrum_type"] == "differential":
+            y_data_summed = compute_array_sum([csd["differential_recoil_rate_events_t_y_kev"] for csd in constituent_spectrum_dict_list])
+            spectrum_dict.update({"differential_recoil_rate_events_t_y_kev" : y_data_summed})
+        elif spectrum_dict["flag_spectrum_type"] == "differential":
+            y_data_summed = compute_array_sum([csd["numEvts"] for csd in constituent_spectrum_dict_list])
+            spectrum_dict.update({"numEvts" : y_data_summed})
+        # returning the 'spectrum_dict' with summed entries
+        return spectrum_dict
 
-    # case: computing the differential rate
-    if spectrum_dict["flag_spectrum_type"] == "differential":
-        print(f"{fn}: computing the differential rate")
-        differential_recoil_rate_events_t_y_kev = [differential_rate_function(e, **differential_rate_param_dict) for e in recoil_energy_kev_list]
-        spectrum_dict.update({
-            "recoil_energy_kev"                             : recoil_energy_kev_list,
-            "differential_recoil_rate_events_t_y_kev"       : differential_recoil_rate_events_t_y_kev,
-        })
+    # case: specified spectrum is a single profile ---> infer differential rate and - if specified - integrated rate
+    else:
 
-    # case: computing the integrated rate
-    # code adapted from C. Hock's 'give_spectrum' function
-    elif spectrum_dict["flag_spectrum_type"] == "integrated":
-        # computing the number of events per energy bin via integration
-        binwidth_kev = recoil_energy_kev_list[1] -recoil_energy_kev_list[0]
-        recoil_energy_kev_bin_edges_list = [bc-0.5*binwidth_kev for bc in recoil_energy_kev_list] +[recoil_energy_kev_list[-1]+0.5*binwidth_kev]
-        args_tuple = (differential_rate_param_dict[key] for key in [*differential_rate_param_dict])
-        print(args_tuple)
-        number_of_events_per_energy_bin = [
-            integrate.quad(
-                differential_rate_function,
-                bc-0.5*binwidth_kev,
-                bc+0.5*binwidth_kev,
-                args = tuple([differential_rate_param_dict[key] for key in [*differential_rate_param_dict]])
-            )[0] for bc in recoil_energy_kev_list]
-        # scaling the integrated number of events either according to 'exposure_t_y' or to 'num_events'
-        if num_events <= 0:
-            number_of_events_per_energy_bin = [noe*exposure_t_y for noe in number_of_events_per_energy_bin]
-        else:
-            total = np.sum(number_of_events_per_energy_bin)
-            num_scale_factor = num_events/total
-            number_of_events_per_energy_bin = [num_scale_factor*noe for noe in number_of_events_per_energy_bin]
-        # rounding the entries of 'number_of_events_per_energy_bin' to integer values:
-        number_of_events_per_energy_bin = [int(noe) for noe in number_of_events_per_energy_bin]
-        # updating the 'spectrum_dict'
-        print(f"{fn}: computing the integrated rate")
-        spectrum_dict.update({
-            "numEvts"               : number_of_events_per_energy_bin,
-            "type_interaction"      : list(spectrum_name.split("_"))[0].upper(),
-            "E_min[keV]"            : recoil_energy_kev_list,
-            "E_max[keV]"            : recoil_energy_kev_list,
-            "field_drift[V/cm]"     : drift_field_v_cm,
-            "x,y,z-position[mm]"    : xyz_pos_mm,
-            "seed"                  : seed,})
+        # inferring the differential rate computation method
+        print(f"{fn}: assessing differential rate computation method")
+        if spectrum_dict["differential_rate_computation"] == "interpolation_from_file":
+            digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_files +spectrum_name +".csv")
+            differential_rate_function = np.interp
+            differential_rate_param_dict = {"xp" : digitized_spectrum_ndarray["x_data"], "fp" : digitized_spectrum_ndarray["y_data"], "left" : 0, "right" : 0}
+        elif callable(spectrum_dict["differential_rate_computation"]):
+            differential_rate_function = spectrum_dict["differential_rate_computation"]
+            differential_rate_param_dict = spectrum_dict["differential_rate_parameters"]
+
+        # case: computing the differential rate
+        if spectrum_dict["flag_spectrum_type"] == "differential":
+            print(f"{fn}: computing the differential rate")
+            differential_recoil_rate_events_t_y_kev = [differential_rate_function(e, **differential_rate_param_dict) for e in recoil_energy_kev_list]
+            spectrum_dict.update({
+                "recoil_energy_kev_list"                        : recoil_energy_kev_list,
+                "differential_recoil_rate_events_t_y_kev"       : differential_recoil_rate_events_t_y_kev,
+            })
+
+        # case: computing the integrated rate
+        # code adapted from C. Hock's 'give_spectrum' function
+        elif spectrum_dict["flag_spectrum_type"] == "integrated":
+            # computing the number of events per energy bin via integration
+            binwidth_kev = recoil_energy_kev_list[1] -recoil_energy_kev_list[0]
+            recoil_energy_kev_bin_edges_list = [bc-0.5*binwidth_kev for bc in recoil_energy_kev_list] +[recoil_energy_kev_list[-1]+0.5*binwidth_kev]
+            args_tuple = (differential_rate_param_dict[key] for key in [*differential_rate_param_dict])
+            print(args_tuple)
+            number_of_events_per_energy_bin = [
+                integrate.quad(
+                    differential_rate_function,
+                    bc-0.5*binwidth_kev,
+                    bc+0.5*binwidth_kev,
+                    args = tuple([differential_rate_param_dict[key] for key in [*differential_rate_param_dict]])
+                )[0] for bc in recoil_energy_kev_list]
+            # scaling the integrated number of events either according to 'exposure_t_y' or to 'num_events'
+            if num_events <= 0:
+                number_of_events_per_energy_bin = [noe*exposure_t_y for noe in number_of_events_per_energy_bin]
+            else:
+                total = np.sum(number_of_events_per_energy_bin)
+                num_scale_factor = num_events/total
+                number_of_events_per_energy_bin = [num_scale_factor*noe for noe in number_of_events_per_energy_bin]
+            # rounding the entries of 'number_of_events_per_energy_bin' to integer values:
+            number_of_events_per_energy_bin = [int(noe) for noe in number_of_events_per_energy_bin]
+            # updating the 'spectrum_dict'
+            print(f"{fn}: computing the integrated rate")
+            spectrum_dict.update({
+                "numEvts"               : number_of_events_per_energy_bin,
+                "type_interaction"      : list(spectrum_name.split("_"))[0].upper(),
+                "E_min[keV]"            : recoil_energy_kev_list,
+                "E_max[keV]"            : recoil_energy_kev_list,
+                "field_drift[V/cm]"     : drift_field_v_cm,
+                "x,y,z-position[mm]"    : xyz_pos_mm,
+                "seed"                  : seed,})
 
     # returning the 'spectrum_dict'
     print(f"{fn}: finished compiling the 'spectrum_dict'")
@@ -1297,21 +1438,19 @@ def gen_spectrum_plot(
                 else:
                     x_data_recoil_energy_kev =  np.linspace(start=plot_xlim[0], stop=plot_xlim[1], num=x_data_size, endpoint=True)
             spectrum_dict = give_spectrum_dict(spectrum_name=spectrum, recoil_energy_kev_list=x_data_recoil_energy_kev)
-            plot_x_data = spectrum_dict["recoil_energy_kev"]
+            plot_x_data = spectrum_dict["recoil_energy_kev_list"]
             plot_y_data = spectrum_dict["differential_recoil_rate_events_t_y_kev"]
 
         # case: retrieving information from differential 'spectrum_dict'
         elif type(spectrum) == dict:
             if spectrum["flag_spectrum_type"] == "differential":
                 spectrum_dict = spectrum.copy()
-                plot_x_data = spectrum_dict["recoil_energy_kev"]
+                plot_x_data = spectrum_dict["recoil_energy_kev_list"]
                 plot_y_data = spectrum_dict["differential_recoil_rate_events_t_y_kev"]
-
 
             # case: retrieving information from integral 'spectrum_dict'
             elif spectrum["flag_spectrum_type"] == "differential":
                 spectrum_dict = spectrum.copy()
-
 
         # plotting the current spectrum
         ax1.plot(
@@ -1322,53 +1461,6 @@ def gen_spectrum_plot(
             linewidth = spectrum_dict["linewidth"],
             zorder = spectrum_dict["zorder"],
             color = spectrum_dict["color"],)
-
-
-
-#            # WIMP spectra are computed analytically
-#            if spectrum_name=="nr_wimps":
-#                wimp_recoil_rate_per_isotope = []
-#                for a in [*xenon_isotopic_composition]:
-#                    if wimp_computation_method=="default":
-#                        y_data_recoil_rate_events_t_y_kev = [xenon_isotopic_composition[a]["abundance"]*calculate_wimp_induced_nuclear_recoil_rate_events_t_y_kev(
-#                            nuclear_recoil_energy_kev = x,
-#                            wimp_mass_gev = wimp_mass_gev,
-#                            wimp_proton_cross_section_cm2 = wimp_nucleon_cross_section_cm2,
-#                            target_nucleus_mass_u = xenon_isotopic_composition[a]["m_u"],
-#                            target_nucleus_mass_number = int(a),
-#                        ) for x in x_data_recoil_energy_kev]
-#                    elif wimp_computation_method=="old":
-#                        y_data_recoil_rate_events_t_y_kev = [xenon_isotopic_composition[a]["abundance"]*calculate_wimp_induced_nuclear_recoil_rate_dru(
-#                            e_nr_kev = x,
-#                            mass_wimp_gev = wimp_mass_gev,
-#                            cross_section_wimp_proton_cm2 = wimp_nucleon_cross_section_cm2,
-#                            energy_threshold_kev = 0.0,
-#                            mass_target_nucleus_u = xenon_isotopic_composition[a]["m_u"],
-#                            mass_number_target_nucleus = int(a),
-#                        ) for x in x_data_recoil_energy_kev]
-#                    elif wimp_computation_method=="cpp":
-#                        y_data_recoil_rate_events_t_y_kev = [1000*365*diffratefunct(
-#                            e_nr_kev = x,
-#                            a = int(a),
-#                            abundance = xenon_isotopic_composition[a]["abundance"],
-#                            target_mass_u = xenon_isotopic_composition[a]["m_u"],
-#                            wimp_mass_gev = wimp_mass_gev,
-#                            cross_section_cm2 = wimp_nucleon_cross_section_cm2,
-#                        ) for x in x_data_recoil_energy_kev]
-#                    wimp_recoil_rate_per_isotope.append(y_data_recoil_rate_events_t_y_kev)
-#                y_data_recoil_rate_events_t_y_kev = [sum([y[l] for y in wimp_recoil_rate_per_isotope]) for l in range(len(x_data_recoil_energy_kev))]
-#                legend_label = r"WIMPs ($m_{\chi}=" +f"{wimp_mass_gev:.0f}" +r"\,\mathrm{GeV},\,\sigma_{p,\chi}^{\mathrm{SI}}=" +f"{wimp_nucleon_cross_section_cm2:.2E}" +r"$)"
-#                legend_label = r"WIMPs"
-
-#            # non-WIMP spectra are interpolated from digitized recoil spectra
-#            else:
-#                digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_data +spectrum_name +".csv")
-#                y_data_recoil_rate_events_t_y_kev = [  np.interp(x, digitized_spectrum_ndarray["x_data"], digitized_spectrum_ndarray["y_data"])  for x in x_data_recoil_energy_kev]
-#                legend_label = spectra_dict[spectrum_name]["latex_label"]
-
-
-
-
 
     # shading the WIMP EROI
     if flag_shade_wimp_eroi != []:
@@ -1392,18 +1484,6 @@ def gen_spectrum_plot(
     plt.show()
     for abspath in flag_output_abspath_list:
         fig.savefig(abspath +flag_output_filename)
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
