@@ -407,7 +407,7 @@ def convert_grabbed_csv_to_ndarray(
     return ndarray
 
 
-def give_spectrum_dict(
+def give_spectrum(
     # entering -1 yields the default values. (They are different for ER- and NR-events, so they are not directly
     # used here). The user recieves a notification about the values used.
     interaction_type ="ER", # ER or NR
@@ -1090,14 +1090,138 @@ plt.scatter(energy_bins, spectrum, s=5)
 
 """
 
+spectrum_dict_default_dict = {
+    "nr_wimps"		                            : {
+        "latex_label"                           : r"WIMPs",
+        "color"                                 : color_wimps_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 2,
+        "zorder"                                : 2,
+        "differential_rate_computation"         : calculate_wimp_induced_nuclear_recoil_rate_events_t_y_kev,
+        "differential_rate_parameters"          : {
+            "wimp_mass_gev"                     : 50,
+            "wimp_proton_cross_section_cm2"     : 1e-47,
+            "target_nucleus_mass_u"             : 130.9050824,
+            "target_nucleus_mass_number"        : 131,
+            "dark_matter_energy_density_gev_cm3": 0.3,
+            "milky_way_escape_velocity_kmps"    : 544.0,
+            "earth_circular_velocity_kmps"      : 220,
+            "flag_verbose"                      : False,
+        },
+    },
+    "nr_atm"		                            : {
+        "latex_label"                           : r"atm",
+        "color"                                 : color_atm_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "extrapolation_from_file",
+    },
+}
+
+
+def give_spectrum_dict(
+    spectrum_name,
+    recoil_energy_kev_list,
+    # 
+    abspath_spectra_files = abspath_sfs_repo_resources,
+    exposure_t_y = 40*5,
+    num_events = -1,
+    # nest parameters
+    seed = 0,
+    drift_field_v_cm = 200,
+    xyz_pos_mm = "-1 -1 -1",
+    # flags
+    flag_spectrum_type = ["differential", "integrated"][0],
+    flag_verbose = False,
+    # keywords
+    spectrum_dict_default_values = spectrum_dict_default_dict, # default 'spectrum_dict' values
+    **kwargs, # additional keyword argument values overwriting those from 'spectrum_dict_default_values'
+):
+
+    """
+    This function is used to generate a 'spectrum_dict' based on one of the templates in 'spectrum_dict_default_dict'.
+    If 'flag_spectrum_type' == "differential" the 'spectrum_dict' resembles the differential rate (in events per tonne x year x keV, computed for every 'recoil_energy_kev' value).
+    If 'flag_spectrum_type' == "integral" the 'spectrum_dict' resembles the integrated number of events per aequidistant recoil energy bin (bin centers are given by the 'recoil_energy_kev' values).
+    """
+
+    # initializing
+    fn = "give_spectrum_dict"
+    print(f"{fn}: initializing 'spectrum_dict'")
+    print(f"\tcopying entry from 'spectrum_dict_default_values'")
+    spectrum_dict = spectrum_dict_default_values[spectrum_name].copy()
+    print(f"\tupdating 'spectrum_dict' with specified keyword arguments")
+    spectrum_dict.update({
+        "flag_spectrum_type"        : flag_spectrum_type,
+    })
+    for k in [*kwargs]:
+        if k == "differential_rate_parameters":
+            for kk in [*kwargs["differential_rate_parameters"]]:
+                spectrum_dict["differential_rate_parameters"].update({kk:kwargs["differential_rate_parameters"][kk]})
+        else:
+            spectrum_dict.update({k:kwargs[k]})
+
+    # inferring the differential rate computation method
+    print(f"{fn}: assessing differential rate computation method")
+    if spectrum_dict["differential_rate_computation"] == "extrapolation_from_file":
+        digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_files +spectrum_name +".csv")
+        differential_rate_function = np.interp
+        differential_rate_param_dict = {"xp" : digitized_spectrum_ndarray["x_data"], "fp" : digitized_spectrum_ndarray["y_data"]}
+    elif callable(spectrum_dict["differential_rate_computation"]):
+        differential_rate_function = spectrum_dict["differential_rate_computation"]
+        differential_rate_param_dict = spectrum_dict["differential_rate_parameters"]
+
+    # case: computing the differential rate
+    if spectrum_dict["flag_spectrum_type"] == "differential":
+        print(f"{fn}: computing the differential rate")
+        differential_recoil_rate_events_t_y_kev = [differential_rate_function(e, **differential_rate_param_dict) for e in recoil_energy_kev_list]
+        spectrum_dict.update({
+            "recoil_energy_kev"                             : recoil_energy_kev_list,
+            "differential_recoil_rate_events_t_y_kev"       : differential_recoil_rate_events_t_y_kev,
+        })
+
+    # case: computing the integrated rate
+    # code adapted from C. Hock's 'give_spectrum' function
+    elif spectrum_dict["flag_spectrum_type"] == "integrated":
+        # computing the number of events per energy bin via integration
+        binwidth_kev = recoil_energy_kev_list[1] -recoil_energy_kev_list[0]
+        recoil_energy_kev_bin_edges_list = [bc-0.5*binwidth_kev for bc in recoil_energy_kev_list] +[recoil_energy_kev_list[-1]+0.5*binwidth_kev]
+        args_tuple = (differential_rate_param_dict[key] for key in [*differential_rate_param_dict])
+        print(args_tuple)
+        number_of_events_per_energy_bin = [
+            integrate.quad(
+                differential_rate_function,
+                bc-0.5*binwidth_kev,
+                bc+0.5*binwidth_kev,
+                args = tuple([differential_rate_param_dict[key] for key in [*differential_rate_param_dict]])
+            )[0] for bc in recoil_energy_kev_list]
+        # scaling the integrated number of events either according to 'exposure_t_y' or to 'num_events'
+        if num_events <= 0:
+            number_of_events_per_energy_bin = [noe*exposure_t_y for noe in number_of_events_per_energy_bin]
+        else:
+            total = np.sum(number_of_events_per_energy_bin)
+            num_scale_factor = num_events/total
+            number_of_events_per_energy_bin = [num_scale_factor*noe for noe in number_of_events_per_energy_bin]
+        # rounding the entries of 'number_of_events_per_energy_bin' to integer values:
+        number_of_events_per_energy_bin = [int(noe) for noe in number_of_events_per_energy_bin]
+        # updating the 'spectrum_dict'
+        print(f"{fn}: computing the integrated rate")
+        spectrum_dict.update({
+            "numEvts"               : number_of_events_per_energy_bin,
+            "type_interaction"      : list(spectrum_name.split("_"))[0].upper(),
+            "E_min[keV]"            : recoil_energy_kev_list,
+            "E_max[keV]"            : recoil_energy_kev_list,
+            "field_drift[V/cm]"     : drift_field_v_cm,
+            "x,y,z-position[mm]"    : xyz_pos_mm,
+            "seed"                  : seed,})
+
+    # returning the 'spectrum_dict'
+    print(f"{fn}: finished compiling the 'spectrum_dict'")
+    return spectrum_dict
+
 
 def gen_spectrum_plot(
     spectra_list, # list of 'spectra_dict' keys, e.g., ["nr_wimps", "nr_atm", "nr_dsnb"]
-    abspath_spectra_data = abspath_sfs_repo_resources,
-    # spectra parameters
-    wimp_mass_gev = 50, # float, hypothetical WIMP mass in GeV
-    wimp_nucleon_cross_section_cm2 = 1*10**(-47), # float,hypothetical WIMP-nucleon cross-section in cm^2
-    wimp_computation_method = ["default", "old", "cpp"][2],
     # plot parameters
     plot_fontsize_axis_label = 11,
     plot_figure_size_x_inch = 5.670,
@@ -1127,14 +1251,7 @@ def gen_spectrum_plot(
 
     # initialization
     fn = "gen_spectrum_plot"
-    if type(spectra_list[0])==str:
-        mode = "compute_dru"
-    elif type(spectra_list[0])==dict:
-        mode = "spectrum_dict"
-        raise Exception(f"{fn}: This still needs to be implemented.")
-    else:
-        raise Exception()
-    if flag_verbose: print(f"{fn}: initializing with 'mode'='{mode}''")
+    if flag_verbose: print(f"{fn}: initializing")
 
     # setting up the canvas
     if flag_verbose: print(f"{fn}: setting up canvas and axes")
@@ -1161,88 +1278,97 @@ def gen_spectrum_plot(
     if plot_log_y_axis: ax1.set_yscale('log')
     if plot_log_x_axis: ax1.set_xscale('log')
 
-    ### case: mode=="compute_dru"
-    if mode=="compute_dru":
-        x_data_size = 301
-        if plot_log_x_axis:
-            if plot_xlim==[]:
-                x_data_recoil_energy_kev = np.logspace(start=-2, stop=+2, num=x_data_size, endpoint=True)
+    # looping over all specified spectra
+    for spectrum in spectra_list:
+
+        # case: generating differential spectrum only from specified string
+        if type(spectrum) == str:
+            x_data_size = 301
+            if plot_log_x_axis:
+                if plot_xlim==[]:
+                    x_data_recoil_energy_kev = np.logspace(start=-2, stop=+2, num=x_data_size, endpoint=True)
+                else:
+                    exp_lower = int(list(f"{plot_xlim[0]:.2E}".split("E"))[-1])-1
+                    exp_upper = int(list(f"{plot_xlim[1]:.2E}".split("E"))[-1])+1
+                    x_data_recoil_energy_kev = np.logspace(start=exp_lower, stop=exp_upper, num=x_data_size, endpoint=True)
             else:
-                exp_lower = int(list(f"{plot_xlim[0]:.2E}".split("E"))[-1])-1
-                exp_upper = int(list(f"{plot_xlim[1]:.2E}".split("E"))[-1])+1
-                x_data_recoil_energy_kev = np.logspace(start=exp_lower, stop=exp_upper, num=x_data_size, endpoint=True)
-        else:
-            if plot_xlim==[]:
-                x_data_recoil_energy_kev = np.linspace(start=0.01, stop=100.01, num=x_data_size, endpoint=True)
-            else:
-                x_data_recoil_energy_kev =  np.linspace(start=plot_xlim[0], stop=plot_xlim[1], num=x_data_size, endpoint=True)
-        for k, spectrum_name in enumerate(spectra_list):
+                if plot_xlim==[]:
+                    x_data_recoil_energy_kev = np.linspace(start=0.01, stop=100.01, num=x_data_size, endpoint=True)
+                else:
+                    x_data_recoil_energy_kev =  np.linspace(start=plot_xlim[0], stop=plot_xlim[1], num=x_data_size, endpoint=True)
+            spectrum_dict = give_spectrum_dict(spectrum_name=spectrum, recoil_energy_kev_list=x_data_recoil_energy_kev)
+            plot_x_data = spectrum_dict["recoil_energy_kev"]
+            plot_y_data = spectrum_dict["differential_recoil_rate_events_t_y_kev"]
 
-            # WIMP spectra are computed analytically
-            if spectrum_name=="nr_wimps":
-                wimp_recoil_rate_per_isotope = []
-                for a in [*xenon_isotopic_composition]:
-                    if wimp_computation_method=="default":
-                        y_data_recoil_rate_events_t_y_kev = [xenon_isotopic_composition[a]["abundance"]*calculate_wimp_induced_nuclear_recoil_rate_events_t_y_kev(
-                            nuclear_recoil_energy_kev = x,
-                            wimp_mass_gev = wimp_mass_gev,
-                            wimp_proton_cross_section_cm2 = wimp_nucleon_cross_section_cm2,
-                            target_nucleus_mass_u = xenon_isotopic_composition[a]["m_u"],
-                            target_nucleus_mass_number = int(a),
-                        ) for x in x_data_recoil_energy_kev]
-                    elif wimp_computation_method=="old":
-                        y_data_recoil_rate_events_t_y_kev = [xenon_isotopic_composition[a]["abundance"]*calculate_wimp_induced_nuclear_recoil_rate_dru(
-                            e_nr_kev = x,
-                            mass_wimp_gev = wimp_mass_gev,
-                            cross_section_wimp_proton_cm2 = wimp_nucleon_cross_section_cm2,
-                            energy_threshold_kev = 0.0,
-                            mass_target_nucleus_u = xenon_isotopic_composition[a]["m_u"],
-                            mass_number_target_nucleus = int(a),
-                        ) for x in x_data_recoil_energy_kev]
-                    elif wimp_computation_method=="cpp":
-                        y_data_recoil_rate_events_t_y_kev = [1000*365*diffratefunct(
-                            e_nr_kev = x,
-                            a = int(a),
-                            abundance = xenon_isotopic_composition[a]["abundance"],
-                            target_mass_u = xenon_isotopic_composition[a]["m_u"],
-                            wimp_mass_gev = wimp_mass_gev,
-                            cross_section_cm2 = wimp_nucleon_cross_section_cm2,
-                        ) for x in x_data_recoil_energy_kev]
-                    wimp_recoil_rate_per_isotope.append(y_data_recoil_rate_events_t_y_kev)
-                y_data_recoil_rate_events_t_y_kev = [sum([y[l] for y in wimp_recoil_rate_per_isotope]) for l in range(len(x_data_recoil_energy_kev))]
-                legend_label = r"WIMPs ($m_{\chi}=" +f"{wimp_mass_gev:.0f}" +r"\,\mathrm{GeV},\,\sigma_{p,\chi}^{\mathrm{SI}}=" +f"{wimp_nucleon_cross_section_cm2:.2E}" +r"$)"
-                legend_label = r"WIMPs"
+        # case: retrieving information from differential 'spectrum_dict'
+        elif type(spectrum) == dict:
+            if spectrum["flag_spectrum_type"] == "differential":
+                spectrum_dict = spectrum.copy()
+                plot_x_data = spectrum_dict["recoil_energy_kev"]
+                plot_y_data = spectrum_dict["differential_recoil_rate_events_t_y_kev"]
 
-            # non-WIMP spectra are interpolated from digitized recoil spectra
-            else:
-                digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_data +spectrum_name +".csv")
-                y_data_recoil_rate_events_t_y_kev = [  np.interp(x, digitized_spectrum_ndarray["x_data"], digitized_spectrum_ndarray["y_data"])  for x in x_data_recoil_energy_kev]
-                legend_label = spectra_dict[spectrum_name]["latex_label"]
 
-            # plotting the current spectrum
-            ax1.plot(
-                x_data_recoil_energy_kev,
-                y_data_recoil_rate_events_t_y_kev,
-                label = legend_label,
-                linestyle = spectra_dict[spectrum_name]["linestyle"],
-                linewidth = spectra_dict[spectrum_name]["linewidth"],
-                zorder = spectra_dict[spectrum_name]["zorder"],
-                color = spectra_dict[spectrum_name]["color"],)
+            # case: retrieving information from integral 'spectrum_dict'
+            elif spectrum["flag_spectrum_type"] == "differential":
+                spectrum_dict = spectrum.copy()
 
-    # data generation
-    #y_data_events_per_t_y_kev_marc = []
-    #for k in range(len(x_data_e_nr_kev)):
-    #    testval = 0
-    #    for l, comp_dict in enumerate(sfs.isotopic_composition_natural_xenon):
-    #        testval += sfs.diffratefunct(
-    #            e_nr_kev = x_data_e_nr_kev[k],
-    #            a = comp_dict["a"],
-    #            abundance = comp_dict["relative_abundance_perc"]/100,
-    #            target_mass_u = comp_dict["m_amu"],
-    #            wimp_mass_gev = wimp_mass_gev,
-    #            cross_section_cm2 = sigma_cm2,
-    #        )
-    #    y_data_events_per_t_y_kev_marc.append(testval)
+
+        # plotting the current spectrum
+        ax1.plot(
+            plot_x_data,
+            plot_y_data,
+            label = spectrum_dict["latex_label"],
+            linestyle = spectrum_dict["linestyle"],
+            linewidth = spectrum_dict["linewidth"],
+            zorder = spectrum_dict["zorder"],
+            color = spectrum_dict["color"],)
+
+
+
+#            # WIMP spectra are computed analytically
+#            if spectrum_name=="nr_wimps":
+#                wimp_recoil_rate_per_isotope = []
+#                for a in [*xenon_isotopic_composition]:
+#                    if wimp_computation_method=="default":
+#                        y_data_recoil_rate_events_t_y_kev = [xenon_isotopic_composition[a]["abundance"]*calculate_wimp_induced_nuclear_recoil_rate_events_t_y_kev(
+#                            nuclear_recoil_energy_kev = x,
+#                            wimp_mass_gev = wimp_mass_gev,
+#                            wimp_proton_cross_section_cm2 = wimp_nucleon_cross_section_cm2,
+#                            target_nucleus_mass_u = xenon_isotopic_composition[a]["m_u"],
+#                            target_nucleus_mass_number = int(a),
+#                        ) for x in x_data_recoil_energy_kev]
+#                    elif wimp_computation_method=="old":
+#                        y_data_recoil_rate_events_t_y_kev = [xenon_isotopic_composition[a]["abundance"]*calculate_wimp_induced_nuclear_recoil_rate_dru(
+#                            e_nr_kev = x,
+#                            mass_wimp_gev = wimp_mass_gev,
+#                            cross_section_wimp_proton_cm2 = wimp_nucleon_cross_section_cm2,
+#                            energy_threshold_kev = 0.0,
+#                            mass_target_nucleus_u = xenon_isotopic_composition[a]["m_u"],
+#                            mass_number_target_nucleus = int(a),
+#                        ) for x in x_data_recoil_energy_kev]
+#                    elif wimp_computation_method=="cpp":
+#                        y_data_recoil_rate_events_t_y_kev = [1000*365*diffratefunct(
+#                            e_nr_kev = x,
+#                            a = int(a),
+#                            abundance = xenon_isotopic_composition[a]["abundance"],
+#                            target_mass_u = xenon_isotopic_composition[a]["m_u"],
+#                            wimp_mass_gev = wimp_mass_gev,
+#                            cross_section_cm2 = wimp_nucleon_cross_section_cm2,
+#                        ) for x in x_data_recoil_energy_kev]
+#                    wimp_recoil_rate_per_isotope.append(y_data_recoil_rate_events_t_y_kev)
+#                y_data_recoil_rate_events_t_y_kev = [sum([y[l] for y in wimp_recoil_rate_per_isotope]) for l in range(len(x_data_recoil_energy_kev))]
+#                legend_label = r"WIMPs ($m_{\chi}=" +f"{wimp_mass_gev:.0f}" +r"\,\mathrm{GeV},\,\sigma_{p,\chi}^{\mathrm{SI}}=" +f"{wimp_nucleon_cross_section_cm2:.2E}" +r"$)"
+#                legend_label = r"WIMPs"
+
+#            # non-WIMP spectra are interpolated from digitized recoil spectra
+#            else:
+#                digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_data +spectrum_name +".csv")
+#                y_data_recoil_rate_events_t_y_kev = [  np.interp(x, digitized_spectrum_ndarray["x_data"], digitized_spectrum_ndarray["y_data"])  for x in x_data_recoil_energy_kev]
+#                legend_label = spectra_dict[spectrum_name]["latex_label"]
+
+
+
+
 
     # shading the WIMP EROI
     if flag_shade_wimp_eroi != []:
