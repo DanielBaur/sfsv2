@@ -11,6 +11,7 @@ import subprocess
 import numpy as np
 import json
 import scipy.integrate as integrate
+import scipy.constants as constants
 from scipy.integrate import quad
 import math
 import matplotlib.pyplot as plt
@@ -41,47 +42,47 @@ abspath_sfs_repo_spectra = abspath_sfs_repo +"spectra/"
 abspath_sfs_repo_resources = abspath_sfs_repo +"resources/"
 
 
-# darwin baseline detector design
-darwin_baseline_detector_dict = {
+# The following dictionary resembles an exemplary 'detector_dict'
+exemplary_darwin_baseline_detector_dict = {
     # primary scintillation (S1) parameters
-    "g1"                : 0.1170,                   # phd per S1 phot at dtCntr (not phe), divide out 2-PE effect,                          JN: 0.119, LUX_Run03: 0.1170 (0.117+/-0.003 WS,0.115+/-0.005 D-D,0.115+/-0.005 CH3T,0.119+/-0.001 LUXSim), XENON10: 0.073
+    "g1"                : 0.12,                     # phd per S1 phot at dtCntr (not phe), divide out 2-PE effect,                          JN: 0.119, LUX_Run03: 0.1170 (0.117+/-0.003 WS,0.115+/-0.005 D-D,0.115+/-0.005 CH3T,0.119+/-0.001 LUXSim), XENON10: 0.073
     "sPEres"            : 0.37,                     # single phe (=PE=photoelectrons) resolution (Gaussian assumed),                        JN: 0.38, LUX_Run03: 0.37 (arXiv:1910.04211.), XENON10: 0.58
-    "sPEthr"            : (0.3 * 1.173) / 0.915,    # POD threshold in phe, usually used IN PLACE of sPEeff,                                JN: 0.35, LUX_Run03: (0.3 * 1.173) / 0.915 (arXiv:1910.04211.), XENON10: 0.35
-    "sPEeff"            : 1.00,                     # actual efficiency, can be used in lieu of POD threshold, units: fractional,           JN: 0.90, LUX_Run03: 1.00 (arXiv:1910.04211), XENON10: 1.00
-    "noiseBaseline[0]"  : 0.00,                     # baseline noise mean in PE (Gaussian),                                                 JN: 0.0, LUX_Run03: 0.00 (arXiv:1910.04211 says -0.01), XENON10: 0.0
-    "noiseBaseline[1]"  : 0.08,                     # baseline noise width in PE (Gaussian),                                                JN: 0.0, LUX_Run03: 0.08 (arXiv:1910.04211), XENON10: 0.0
+    "sPEthr"            : 0.35,                     # POD threshold in phe, usually used IN PLACE of sPEeff,                                JN: 0.35, LUX_Run03: (0.3 * 1.173) / 0.915 (arXiv:1910.04211.), XENON10: 0.35
+    "sPEeff"            : 0.9,                      # actual efficiency, can be used in lieu of POD threshold, units: fractional,           JN: 0.90, LUX_Run03: 1.00 (arXiv:1910.04211), XENON10: 1.00
+    "noiseBaseline[0]"  : 0.0,                      # baseline noise mean in PE (Gaussian),                                                 JN: 0.0, LUX_Run03: 0.00 (arXiv:1910.04211 says -0.01), XENON10: 0.0
+    "noiseBaseline[1]"  : 0.0,                      # baseline noise width in PE (Gaussian),                                                JN: 0.0, LUX_Run03: 0.08 (arXiv:1910.04211), XENON10: 0.0
     "noiseBaseline[2]"  : 0.0,                      # baseline noise mean in e- (for grid wires),                                           JN: none, LUX_Run03: 0.0, XENON10: 0.0
     "noiseBaseline[3]"  : 0.0,                      # baseline noise width in e- (for grid wires),                                          JN: none, LUX_Run03: 0.0, XENON10: 0.0
-    "P_dphe"            : 0.173,                    # chance 1 photon makes 2 phe instead of 1 in Hamamatsu PMT, units: fractional,         JN: 0.22, LUX_Run03: 0.173 (arXiv:1910.04211), XENON10: 0.2
+    "P_dphe"            : 0.2,                      # chance 1 photon makes 2 phe instead of 1 in Hamamatsu PMT, units: fractional,         JN: 0.22, LUX_Run03: 0.173 (arXiv:1910.04211), XENON10: 0.2
     "coinWind"          : 100,                      # S1 coincidence window in ns,                                                          JN: 100, LUX_Run03: 100 (1310.8214), XENON10: 100
-    "coinLevel"         : 2,                        # how many PMTs have to fire for an S1 to count,                                        JN: 3, LUX_Run03: 2 (1512.03506), XENON10: 2
-    "numPMTs"           : 119,                      # for coincidence calculation,                                                          JN: 494, LUX_Run03: 119 (122 minus 3 off), XENON10: 89
+    "coinLevel"         : 3,                        # how many PMTs have to fire for an S1 to count,                                        JN: 3, LUX_Run03: 2 (1512.03506), XENON10: 2
+    "numPMTs"           : 494,                      # for coincidence calculation,                                                          JN: 494, LUX_Run03: 119 (122 minus 3 off), XENON10: 89
     "OldW13eV"          : "true",                   # default true, which means use "classic" W instead of Baudis / EXO's,                  JN: none, LUX_Run03: "true", XENON10: "true"
     "noiseLinear[0]"    : 0.0e-2,                   # S1->S1 Gaussian-smeared with noiseL[0]*S1, units: fraction NOT %!                     JN: none, LUX_Run03: 0.0e-2 (1910.04211 p.12, to match 1610.02076 Fig. 8.), XENON10: 3e-2
     "noiseLinear[1]"    : 0.0e-2,                   # S2->S2 Gaussian-smeared with noiseL[1]*S2, units: fraction NOT %!                     JN: none, LUX_Run03: 0.0e-2 (1910.04211 p.12, to match 1610.02076 Fig. 8.), XENON10: 3e-2
     # ionization and secondary scintillation (S2) parameters
     "g1_gas"            : 0.1,                      # phd per S2 photon in gas, used to get SE size, units: phd per e-,                     JN: 0.102, LUX_Run03: 0.1 (0.1 in 1910.04211), XENON10: 0.0655
     "s2Fano"            : 3.6,                      # Fano-like fudge factor for SE width, dimensionless,                                   JN: 3.61, LUX_Run03: 3.6 (3.7 in 1910.04211; this matches 1608.05381 better), XENON10: 3.61
-    "s2_thr"            : (150.0 * 1.173) / 0.915,  # the S2 threshold in phe or PE, *not* phd. Affects NR most,                            JN: 100.0, LUX_Run03: (150.0 * 1.173) / 0.915 (65-194 pe in 1608.05381), XENON10: 300.0
-    "E_gas"             : 6.25,                     # field in kV/cm between liquid/gas border and anode,                                   JN: 10.85, LUX_Run03: 6.25 (6.55 in 1910.04211), XENON10: 12.0
-    "eLife_us"          : 800.0,                    # the drift electron mean lifetime in micro-seconds,                                    JN: 1600.0, LUX_Run03: 800.0 (p.44 of James Verbus PhD thesis Brown), XENON10: 2200.0
+    "s2_thr"            : 100,                      # the S2 threshold in phe or PE, *not* phd. Affects NR most,                            JN: 100.0, LUX_Run03: (150.0 * 1.173) / 0.915 (65-194 pe in 1608.05381), XENON10: 300.0
+    "E_gas"             : 10.0,                     # field in kV/cm between liquid/gas border and anode,                                   JN: 10.85, LUX_Run03: 6.25 (6.55 in 1910.04211), XENON10: 12.0
+    "eLife_us"          : 5000.0,                   # the drift electron mean lifetime in micro-seconds,                                    JN: 1600.0, LUX_Run03: 800.0 (p.44 of James Verbus PhD thesis Brown), XENON10: 2200.0
     # thermodynamic properties
-#    "inGas"             : "false",                  # (duh),                                                                               JN: "false", LUX_Run03: commented out, XENON10: "false"
-    "T_Kelvin"          : 173.0,                    # for liquid drift speed calculation, temperature in Kelvin,                            JN: 175.0, LUX_Run03: 173.0 (1910.04211), XENON10: 177.0
-    "p_bar"             : 1.57,                     # gas pressure in units of bars, it controls S2 size,                                   JN: 2.0, LUX_Run03: 1.57 (1910.04211), XENON10: 2.14
+#    "inGas"             : "false",                 # (duh),                                                                               JN: "false", LUX_Run03: commented out, XENON10: "false"
+    "T_Kelvin"          : 175.0,                    # for liquid drift speed calculation, temperature in Kelvin,                            JN: 175.0, LUX_Run03: 173.0 (1910.04211), XENON10: 177.0
+    "p_bar"             : 2.0,                      # gas pressure in units of bars, it controls S2 size,                                   JN: 2.0, LUX_Run03: 1.57 (1910.04211), XENON10: 2.14
     # data analysis parameters and geometry
-    "dtCntr"            : 160.0,                    # center of detector for S1 corrections, in usec.,                                      JN: 822.0, LUX_Run03: 160.0 (p.61 Dobi thesis UMD, 159 in 1708.02566), XENON10: 40.0
-    "dt_min"            : 38.0,                     # minimum. Top of detector fiducial volume, units: microseconds,                        JN: 75.8, LUX_Run03: 38.0 (1608.05381), XENON10: 20.0
-    "dt_max"            : 305.0,                    # maximum. Bottom of detector fiducial volume, units: microseconds,                     JN: 1536.5, LUX_Run03: 305.0 (1608.05381), XENON10: 60.0
-    "radius"            : 200.0,                    # millimeters (fiducial rad), units: millimeters,                                       JN: 1300., LUX_Run03: 200.0 (1512.03506), XENON10: 50.0
-    "radmax"            : 235.0,                    # actual physical geo. limit, units: millimeters,                                       JN: 1350., LUX_Run03: 235.0 (1910.04211), XENON10: 50.0
-    "TopDrift"          : 544.95,                   # top of drif volume in mm not cm or us, i.e., this *is* where dt=0, z=0mm is cathode,  JN: 3005.0, LUX_Run03: 544.95 (544.95 in 1910.04211), XENON10: 150.0
-    "anode"             : 549.2,                    # the level of the anode grid-wire plane in mm,                                         JN: 3012.5, LUX_Run03: 549.2 (1910.04211 and 549 in 1708.02566), XENON10: 152.5
-    "gate"              : 539.2,                    # mm. this is where the E-field changes (higher),                                       JN: 3000.0, LUX_Run03: 539.2 (1910.04211 and 539 in 1708.02566), XENON10: 147.5
-    "cathode"           : 55.90,                    # mm. defines point below which events are gamma-X                                      JN: 250, LUX_Run03: 55.90 (55.9-56 in 1910.04211,1708.02566), XENON10: 1.00
+    "dtCntr"            : 822.0,                    # center of detector for S1 corrections, in usec.,                                      JN: 822.0, LUX_Run03: 160.0 (p.61 Dobi thesis UMD, 159 in 1708.02566), XENON10: 40.0
+    "dt_min"            : 75.8,                     # minimum. Top of detector fiducial volume, units: microseconds,                        JN: 75.8, LUX_Run03: 38.0 (1608.05381), XENON10: 20.0
+    "dt_max"            : 1536.5,                   # maximum. Bottom of detector fiducial volume, units: microseconds,                     JN: 1536.5, LUX_Run03: 305.0 (1608.05381), XENON10: 60.0
+    "radius"            : 1300.0,                   # millimeters (fiducial rad), units: millimeters,                                       JN: 1300., LUX_Run03: 200.0 (1512.03506), XENON10: 50.0
+    "radmax"            : 1350.0,                   # actual physical geo. limit, units: millimeters,                                       JN: 1350., LUX_Run03: 235.0 (1910.04211), XENON10: 50.0
+    "TopDrift"          : 3005.0,                   # top of drif volume in mm not cm or us, i.e., this *is* where dt=0, z=0mm is cathode,  JN: 3005.0, LUX_Run03: 544.95 (544.95 in 1910.04211), XENON10: 150.0
+    "anode"             : 3012.5,                   # the level of the anode grid-wire plane in mm,                                         JN: 3012.5, LUX_Run03: 549.2 (1910.04211 and 549 in 1708.02566), XENON10: 152.5
+    "gate"              : 3000.0,                   # mm. this is where the E-field changes (higher),                                       JN: 3000.0, LUX_Run03: 539.2 (1910.04211 and 539 in 1708.02566), XENON10: 147.5
+    "cathode"           : 250.0,                    # mm. defines point below which events are gamma-X                                      JN: 250, LUX_Run03: 55.90 (55.9-56 in 1910.04211,1708.02566), XENON10: 1.00
     # 2D (xy) position reconstruction
     "PosResExp"         : 0.015,                    # exp increase in pos recon res at hi r, units: 1/mm,                                   JN: 0.015, LUX_Run03: 0.015 (arXiv:1710.02752 indirectly), XENON10: 0.015
-    "PosResBase"        : 70.8364,                  # baseline unc in mm, see NEST.cpp for usage,                                           JN: 30.0, LUX_Run03: 70.8364 ((1710.02752 indirectly), XEONON10: 70.8364
+    "PosResBase"        : 30.,                      # baseline unc in mm, see NEST.cpp for usage,                                           JN: 30.0, LUX_Run03: 70.8364 ((1710.02752 indirectly), XEONON10: 70.8364
 }
 
 
@@ -92,9 +93,6 @@ darwin_baseline_detector_dict = {
 ### general definitions
 ############################################
 
-
-wimp_eroi_kev_ee = [1.4, 10.6]
-wimp_eroi_kev_nr = [4.9, 40.9]
 
 
 # This function is used to retrieve a Python3 dictionary stored as a .json file.
@@ -116,7 +114,17 @@ def compute_array_sum(array_list):
     for k in range(len(array_sum)):
         for array in array_list:
             array_sum[k] += array[k]
+    array_sum = [float(jfk) for jfk in array_sum]
     return array_sum
+
+
+def bin_centers_from_interval(
+    interval,
+    n_bins,
+):
+    binwidth = (interval[1]-interval[0])/n_bins
+    bin_edges = np.linspace(interval[0], interval[1], n_bins+1, True)
+    return [be +0.5*binwidth for be in bin_edges[:-1]]
 
 
 def convert_detector_header_into_detector_dict(
@@ -223,6 +231,7 @@ color_be7_default = "green"
 color_b8_default = "red"
 color_atm_default = "purple"
 color_dsnb_default =  "brown"
+color_nunubetabeta_default = "olive"
 
 
 xenon_isotopic_composition = {
@@ -718,6 +727,42 @@ def calculate_wimp_induced_nuclear_recoil_rate_in_natural_xenon_events_t_y_kev(
     return diffrate_events_t_y_kev
 
 
+def calculate_nunubetabeta_er_rate_events_t_y_kev_alt(
+    electronic_recoil_energy_kev_ee, # electronic recoil energy in keV_ee
+    abundance_xe136 = 0.08857, # abundance of xe136, default is natural abundance, not in percent
+):
+
+    """
+    Gives dN/dT for the two neutrino double beta decay of 136 Xe as estimated by the Primakoff-Rosen Appromximation.
+    For details see: https://www.physik.uzh.ch/groups/groupbaudis/aspera09/wiki/doku.php?id=simulation:0v2b:2nbb_analytic (accessed: 30th July 2022)
+    """
+
+    # definitions
+    electron_mass_kev = 510.998950
+    Q_kev = 2.4578e3 # Q-value in keV
+    Q_em = Q_kev/electron_mass_kev
+    xe136_isotopic_mass_kg = 135.907219 *1.66053906660 *10**(-27)
+    xe136_half_life_s = 2.165 *10**21 *(365*24*60*60)
+    if electronic_recoil_energy_kev_ee > Q_kev:
+        return 0
+
+    # Primakoff-Rosen approximation
+    def Primakoff_Rosen_approximation(recoil_energy_kev):
+        T = recoil_energy_kev/electron_mass_kev
+        Q = Q_kev/electron_mass_kev
+        return T *(Q-T)**5 *(1 +2*T +(4/3)*T**2 +(1/3)*T**3 +(1/30)*T**4)
+
+    # computing Primakoff-Rosen approximation PDF
+    normalization_constant = quad(Primakoff_Rosen_approximation, 0, Q_kev)[0]
+    primakoff_rosen_approximation  = (1/normalization_constant) *Primakoff_Rosen_approximation(electronic_recoil_energy_kev_ee)
+
+    # computing rate in events / (t x y x keV)
+    xe136_atoms_per_metric_tonne = 1000 *abundance_xe136 /xe136_isotopic_mass_kg
+    xe136_activity_per_metric_tonne = xe136_atoms_per_metric_tonne *(np.log(2)/xe136_half_life_s)
+    xe136_decays_per_metric_tonne_per_year = xe136_activity_per_metric_tonne *(60*60*24*365)
+    return xe136_decays_per_metric_tonne_per_year *primakoff_rosen_approximation
+
+
 
 
 
@@ -1006,24 +1051,6 @@ plt.scatter(energy_bins, spectrum, s=5)
 
 
 spectrum_dict_default_dict = {
-    "nr_wimps"		                            : {
-        "latex_label"                           : r"WIMPs",
-        "color"                                 : color_wimps_default,
-        "linestyle"                             : "-",
-        "linewidth"                             : 2,
-        "zorder"                                : 2,
-        "differential_rate_computation"         : calculate_wimp_induced_nuclear_recoil_rate_events_t_y_kev,
-        "differential_rate_parameters"          : {
-            "wimp_mass_gev"                     : 50,
-            "wimp_proton_cross_section_cm2"     : 1e-47,
-            "target_nucleus_mass_u"             : 130.9050824,
-            "target_nucleus_mass_number"        : 131,
-            "dark_matter_energy_density_gev_cm3": 0.3,
-            "milky_way_escape_velocity_kmps"    : 544.0,
-            "earth_circular_velocity_kmps"      : 220,
-            "flag_verbose"                      : False,
-        },
-    },
     "nr_wimps_nat_xe"                           : {
         "latex_label"                           : r"WIMPs",
         "color"                                 : color_wimps_default,
@@ -1177,6 +1204,17 @@ spectrum_dict_default_dict = {
         "zorder"                                : 1,
         "differential_rate_computation"         : "interpolation_from_file",
     },
+    "er_nunubetabeta"	                        : {
+        "latex_label"                           : r"$\nu\nu\beta\beta$",
+        "color"                                 : color_nunubetabeta_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : calculate_nunubetabeta_er_rate_events_t_y_kev_alt,
+        "differential_rate_parameters"          : {
+            "abundance_xe136"                   : 0.08857,
+        },
+    },
 }
 
 
@@ -1218,6 +1256,26 @@ spectrum_dict_default_dict.update({
         "differential_rate_computation"         : "spectrum_sum",
         "constituent_spectra_list"              : ["nr_be7_384", "nr_be7_861"],
     },
+    # This is the combined NR background model used for the SFS study
+    "combined_nr_background"                             : {
+        "latex_label"                           : r"combined NR background",
+        "color"                                 : color_nrs_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 2,
+        "zorder"                                : 2,
+        "differential_rate_computation"         : "spectrum_sum",
+        "constituent_spectra_list"              : ["nr_be7_384", "nr_be7_861", "nr_o15", "nr_n13", "nr_f17"],
+    },
+    # This is the combined ER background model used for the SFS study
+    "combined_er_background"                    : {
+        "latex_label"                           : r"combined ER background",
+        "color"                                 : color_ers_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 2,
+        "zorder"                                : 2,
+        "differential_rate_computation"         : "spectrum_sum",
+        "constituent_spectra_list"              : ["er_be7_384", "er_be7_861", "er_o15", "er_n13", "er_nunubetabeta", "er_pp"],
+    },
 })
 
 
@@ -1233,7 +1291,7 @@ def give_spectrum_dict(
     drift_field_v_cm = 200,
     xyz_pos_mm = "-1 -1 -1",
     # flags
-    flag_spectrum_type = ["differential", "integrated"][0],
+    flag_spectrum_type = ["differential", "integral"][0],
     flag_verbose = False,
     # keywords
     spectrum_dict_default_values = spectrum_dict_default_dict, # default 'spectrum_dict' values
@@ -1248,18 +1306,18 @@ def give_spectrum_dict(
 
     # initializing
     fn = "give_spectrum_dict"
-    print(f"{fn}: initializing 'spectrum_dict'")
-    print(f"\tcopying entry from 'spectrum_dict_default_values'")
+    if flag_verbose: print(f"{fn}: initializing 'spectrum_dict'")
+    if flag_verbose: print(f"\tcopying entry from 'spectrum_dict_default_values'")
     spectrum_dict = spectrum_dict_default_values[spectrum_name].copy()
-    print(f"\tupdating 'spectrum_dict' with specified keyword arguments")
+    if flag_verbose: print(f"\tupdating 'spectrum_dict' with specified keyword arguments")
     spectrum_dict.update({
-        "recoil_energy_kev_list"    : recoil_energy_kev_list,
-        "exposure_t_y" : exposure_t_y,
-        "num_events" : num_events,
-        "seed" : seed,
-        "drift_field_v_cm" : drift_field_v_cm,
-        "xyz_pos_mm" : xyz_pos_mm,
-        "flag_verbose" : flag_verbose,
+        "recoil_energy_kev_list"    : list(recoil_energy_kev_list),
+        "exposure_t_y"              : exposure_t_y,
+        "num_events"                : num_events,
+        "seed"                      : seed,
+        "field_drift[V/cm]"         : drift_field_v_cm,
+        "x,y,z-position[mm]"        : xyz_pos_mm,
+        "flag_verbose"              : flag_verbose,
         "flag_spectrum_type"        : flag_spectrum_type,
     })
     for k in [*kwargs]:
@@ -1292,18 +1350,27 @@ def give_spectrum_dict(
         #spectrum_dict = constituent_spectrum_dict_list[0].copy()
         if spectrum_dict["flag_spectrum_type"] == "differential":
             y_data_summed = compute_array_sum([csd["differential_recoil_rate_events_t_y_kev"] for csd in constituent_spectrum_dict_list])
-            spectrum_dict.update({"differential_recoil_rate_events_t_y_kev" : y_data_summed})
-        elif spectrum_dict["flag_spectrum_type"] == "differential":
+            spectrum_dict.update({
+                "differential_recoil_rate_events_t_y_kev" : y_data_summed})
+        elif spectrum_dict["flag_spectrum_type"] == "integral":
             y_data_summed = compute_array_sum([csd["numEvts"] for csd in constituent_spectrum_dict_list])
-            spectrum_dict.update({"numEvts" : y_data_summed})
+            spectrum_dict.update({
+                "numEvts"               : list(y_data_summed),
+                "type_interaction"      : str(constituent_spectrum_dict_list[0]["type_interaction"]),
+                "E_min[keV]"            : list(recoil_energy_kev_list),
+                "E_max[keV]"            : list(recoil_energy_kev_list),
+            })
+
         # returning the 'spectrum_dict' with summed entries
+        if callable(spectrum_dict["differential_rate_computation"]):
+            spectrum_dict.pop("differential_rate_computation")
         return spectrum_dict
 
     # case: specified spectrum is a single profile ---> infer differential rate and - if specified - integrated rate
     else:
 
         # inferring the differential rate computation method
-        print(f"{fn}: assessing differential rate computation method")
+        if flag_verbose: print(f"{fn}: assessing differential rate computation method")
         if spectrum_dict["differential_rate_computation"] == "interpolation_from_file":
             digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_files +spectrum_name +".csv")
             differential_rate_function = np.interp
@@ -1314,21 +1381,20 @@ def give_spectrum_dict(
 
         # case: computing the differential rate
         if spectrum_dict["flag_spectrum_type"] == "differential":
-            print(f"{fn}: computing the differential rate")
+            if flag_verbose: print(f"{fn}: computing the differential rate")
             differential_recoil_rate_events_t_y_kev = [differential_rate_function(e, **differential_rate_param_dict) for e in recoil_energy_kev_list]
             spectrum_dict.update({
-                "recoil_energy_kev_list"                        : recoil_energy_kev_list,
-                "differential_recoil_rate_events_t_y_kev"       : differential_recoil_rate_events_t_y_kev,
+                "recoil_energy_kev_list"                        : list(recoil_energy_kev_list),
+                "differential_recoil_rate_events_t_y_kev"       : list(differential_recoil_rate_events_t_y_kev),
             })
 
         # case: computing the integrated rate
         # code adapted from C. Hock's 'give_spectrum' function
-        elif spectrum_dict["flag_spectrum_type"] == "integrated":
+        elif spectrum_dict["flag_spectrum_type"] == "integral":
             # computing the number of events per energy bin via integration
             binwidth_kev = recoil_energy_kev_list[1] -recoil_energy_kev_list[0]
             recoil_energy_kev_bin_edges_list = [bc-0.5*binwidth_kev for bc in recoil_energy_kev_list] +[recoil_energy_kev_list[-1]+0.5*binwidth_kev]
             args_tuple = (differential_rate_param_dict[key] for key in [*differential_rate_param_dict])
-            print(args_tuple)
             number_of_events_per_energy_bin = [
                 integrate.quad(
                     differential_rate_function,
@@ -1346,18 +1412,20 @@ def give_spectrum_dict(
             # rounding the entries of 'number_of_events_per_energy_bin' to integer values:
             number_of_events_per_energy_bin = [int(noe) for noe in number_of_events_per_energy_bin]
             # updating the 'spectrum_dict'
-            print(f"{fn}: computing the integrated rate")
+            if flag_verbose: print(f"{fn}: computing the integrated rate")
             spectrum_dict.update({
-                "numEvts"               : number_of_events_per_energy_bin,
+                "numEvts"               : list(number_of_events_per_energy_bin),
                 "type_interaction"      : list(spectrum_name.split("_"))[0].upper(),
-                "E_min[keV]"            : recoil_energy_kev_list,
-                "E_max[keV]"            : recoil_energy_kev_list,
-                "field_drift[V/cm]"     : drift_field_v_cm,
-                "x,y,z-position[mm]"    : xyz_pos_mm,
-                "seed"                  : seed,})
+                "E_min[keV]"            : list(recoil_energy_kev_list),
+                "E_max[keV]"            : list(recoil_energy_kev_list),
+                "field_drift[V/cm]"     : str(drift_field_v_cm),
+                "x,y,z-position[mm]"    : str(xyz_pos_mm),
+                "seed"                  : str(seed),})
 
     # returning the 'spectrum_dict'
-    print(f"{fn}: finished compiling the 'spectrum_dict'")
+    if flag_verbose: print(f"{fn}: finished compiling the 'spectrum_dict'")
+    if callable(spectrum_dict["differential_rate_computation"]):
+        spectrum_dict.pop("differential_rate_computation")
     return spectrum_dict
 
 
@@ -1449,8 +1517,26 @@ def gen_spectrum_plot(
                 plot_y_data = spectrum_dict["differential_recoil_rate_events_t_y_kev"]
 
             # case: retrieving information from integral 'spectrum_dict'
-            elif spectrum["flag_spectrum_type"] == "differential":
+            elif spectrum["flag_spectrum_type"] == "integral":
+                ax1.set_ylabel(r"integral number of events per energy bin", fontsize=plot_fontsize_axis_label)
                 spectrum_dict = spectrum.copy()
+                plot_x_data = spectrum_dict["E_min[keV]"]
+                binwidth = plot_x_data[1] -plot_x_data[0]
+                plot_x_data = [plot_x_data[k//2] for k in range(len(plot_x_data+plot_x_data))]
+                plot_x_data = [plot_x_data[k]-0.5*binwidth if k%2==0 else plot_x_data[k]+0.5*binwidth for k in range(len(plot_x_data))]
+                plot_x_data = [plot_x_data[0]] +plot_x_data +[plot_x_data[-1]]
+                plot_y_data = list(spectrum_dict["numEvts"])
+                plot_y_data = [plot_y_data[k//2] for k in range(len(plot_y_data+plot_y_data))]
+                plot_y_data = [0] +plot_y_data +[0]
+                # plotting the histogram bar lines
+                for k, x in enumerate(plot_x_data):
+                    ax1.plot(
+                        [plot_x_data[k],plot_x_data[k]],
+                        [0,plot_y_data[k]],
+                        linestyle = spectrum_dict["linestyle"],
+                        linewidth = spectrum_dict["linewidth"]/4,
+                        zorder = spectrum_dict["zorder"]-1,
+                        color = spectrum_dict["color"],)
 
         # plotting the current spectrum
         ax1.plot(
@@ -1708,10 +1794,10 @@ def install_detector_header_file(
 
 def execNEST(
     spectrum_dict, # dict, dictionary resembling the input spectrum to be simulated by NEST
+    baseline_detector_dict, # string, abspathfile of the DARWIN baseline detector
     detector_dict = {}, # dict or abspath-string, dictionary or .json-file resembling the detector the spectrum is supposed to be simulated in
     detector_name = "", # string, name of the detector, only required when not referring to an existing file
     abspathfile_execNEST_binary = abspathfile_nest_installation_execNEST_bin, # string, abspathfile of the 'execNEST' executiable generated in the 'install' NEST folder
-    baseline_detector_dict = darwin_baseline_detector_dict, # string, abspathfile of the DARWIN baseline detector
     flag_verbose = False, # bool, flag indicating whether the print-statements are being printed
     flag_print_stdout_and_stderr = False, # bool, flag indicating whether the 'stdout' and 'stderr' values returned by executing the 'execNEST' C++ executable are being printed
 ):
