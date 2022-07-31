@@ -15,6 +15,7 @@ import scipy.constants as constants
 from scipy.integrate import quad
 import math
 import matplotlib.pyplot as plt
+import wimprates
 
 
 
@@ -220,9 +221,11 @@ def compute_g2_from_detector_configuration(
 ############################################
 
 
-color_wimps_default = '#004A9B'
-color_nrs_default = '#004A9B'
-color_ers_default = '#C1002A'
+color_s1_default = "#008f0e" # green as S1 color in miscfic TPC scheme
+colro_s2_default = "#e39700" # orange as S2 color in miscfig TPC scheme
+color_wimps_default = '#004A9B' # ALUFR logo blue
+color_nrs_default = "#06bcd4" # blue as xenon liquid color in miscfig TPC scheme
+color_ers_default = '#C1002A' # ALUFR logo red
 color_hep_default = "pink"
 color_pep_default = "cyan"
 color_pp_default = "orange"
@@ -1059,13 +1062,25 @@ spectrum_dict_default_dict = {
         "zorder"                                : 2,
         "differential_rate_computation"         : calculate_wimp_induced_nuclear_recoil_rate_in_natural_xenon_events_t_y_kev,
         "differential_rate_parameters"          : {
-            "wimp_mass_gev"                     : 50,
+            "wimp_mass_gev"                     : 25,
             "wimp_proton_cross_section_cm2"     : 1e-47,
             "xenon_isotopic_composition_dict"   : xenon_isotopic_composition,
             "dark_matter_energy_density_gev_cm3": 0.3,
             "milky_way_escape_velocity_kmps"    : 544.0,
             "earth_circular_velocity_kmps"      : 220,
             "flag_verbose"                      : False,
+        },
+    },
+    "nr_wimps_wimprates"                        : {
+        "latex_label"                           : r"WIMPs",
+        "color"                                 : color_wimps_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 2,
+        "zorder"                                : 2,
+        "differential_rate_computation"         : wimprates.rate_wimp_std,
+        "differential_rate_parameters"          : {
+            "mw"                                : 25,
+            "sigma_nucleon"                     : 1e-47,
         },
     },
     "nr_atm"		                            : {
@@ -1264,7 +1279,7 @@ spectrum_dict_default_dict.update({
         "linewidth"                             : 2,
         "zorder"                                : 2,
         "differential_rate_computation"         : "spectrum_sum",
-        "constituent_spectra_list"              : ["nr_be7_384", "nr_be7_861", "nr_o15", "nr_n13", "nr_f17"],
+        "constituent_spectra_list"              : ["nr_atm", "nr_hep", "nr_atm", "nr_b8", "nr_dsnb"],
     },
     # This is the combined ER background model used for the SFS study
     "combined_er_background"                    : {
