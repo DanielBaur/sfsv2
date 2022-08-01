@@ -28,7 +28,6 @@ import os
 
 
 # paths and files: NEST installation
-abspath_nest_installation = "/home/daniel/Desktop/arbeitsstuff/sfs/nest_v_2_3_9/"
 abspath_nest_installation = os.getenv('ABSPATH_NEST_INSTALLATION')
 abspath_nest_installation_install = abspath_nest_installation +"install/"
 abspath_nest_installation_build = abspath_nest_installation +"build/"
@@ -36,13 +35,6 @@ abspath_nest_installation_nest = abspath_nest_installation +"nest/"
 abspath_nest_installation_nest_include_detectors = abspath_nest_installation_nest +"include/Detectors/"
 abspathfile_nest_installation_execNEST_cpp = abspath_nest_installation_nest +"src/execNEST.cpp"
 abspathfile_nest_installation_execNEST_bin = abspath_nest_installation_install +"bin/execNEST"
-
-
-# paths and files: sfs repo
-abspath_sfs_repo = "/home/daniel/Desktop/arbeitsstuff/sfs/github_repo_v2/"
-abspath_sfs_repo_detectors = abspath_sfs_repo +"detectors/"
-abspath_sfs_repo_spectra = abspath_sfs_repo +"spectra/"
-abspath_sfs_repo_resources = abspath_sfs_repo +"resources/"
 
 
 # The following dictionary resembles an exemplary 'detector_dict'
@@ -1815,9 +1807,10 @@ def install_detector_header_file(
 
 def execNEST(
     spectrum_dict, # dict, dictionary resembling the input spectrum to be simulated by NEST
-    baseline_detector_dict, # string, abspathfile of the DARWIN baseline detector
+    baseline_detector_dict, # dict, 'detector_dict' of the DARWIN baseline detector
     detector_dict = {}, # dict or abspath-string, dictionary or .json-file resembling the detector the spectrum is supposed to be simulated in
     detector_name = "", # string, name of the detector, only required when not referring to an existing file
+    abspath_list_detector_dict_json_output = [], # list of strings, list of abspaths into which the detector_dict.json files are saved
     abspathfile_execNEST_binary = abspathfile_nest_installation_execNEST_bin, # string, abspathfile of the 'execNEST' executiable generated in the 'install' NEST folder
     flag_verbose = False, # bool, flag indicating whether the print-statements are being printed
     flag_print_stdout_and_stderr = False, # bool, flag indicating whether the 'stdout' and 'stderr' values returned by executing the 'execNEST' C++ executable are being printed
@@ -1861,14 +1854,14 @@ def execNEST(
             print(new_detector_dict)
             convert_detector_dict_into_detector_header(
                 detector_dict = new_detector_dict,
-                abspath_output_list = [abspath_sfs_repo_detectors],
+                abspath_output_list = abspath_list_detector_dict_json_output +[abspath_nest_installation_nest_include_detectors],
                 detector_name = detector_name,
                 flag_verbose = flag_verbose,
             )
         text_add="\n" if detector_dict != {} else ""
         if flag_verbose: print(text_add +f"{fn}: installing new detector header file")
         install_detector_header_file(
-            abspathfile_new_detector_hh = abspath_sfs_repo_detectors +detector_name +".hh",
+            abspathfile_new_detector_hh = abspath_nest_installation_nest_include_detectors +detector_name +".hh",
             flag_clean_reinstall = True,
             flag_verbose = flag_verbose)
 
@@ -1908,16 +1901,17 @@ def execNEST(
                 raise Exception(f"ERROR: len(spectrum_dict['numEvts'])==len(spectrum_dict['E_min[keV]'])==len(spectrum_dict['E_max[keV]'])")
             # looping over all resulting 'cmd_strings'
             for k, num in enumerate(spectrum_dict["numEvts"]):
-                cmd_string = " ".join([
-                    abspathfile_execNEST_binary,
-                    str(spectrum_dict["numEvts"][k]),
-                    str(spectrum_dict["type_interaction"]),
-                    str(spectrum_dict["E_min[keV]"][k]),
-                    str(spectrum_dict["E_max[keV]"][k]),
-                    str(spectrum_dict["field_drift[V/cm]"]),
-                    str(xyz),
-                    str(seed)])
-                cmd_list.append(cmd_string)
+                if spectrum_dict["numEvts"][k] > 0: # sometimes you automatically generate spectrum histograms with empty bins
+                    cmd_string = " ".join([
+                        abspathfile_execNEST_binary,
+                        str(spectrum_dict["numEvts"][k]),
+                        str(spectrum_dict["type_interaction"]),
+                        str(spectrum_dict["E_min[keV]"][k]),
+                        str(spectrum_dict["E_max[keV]"][k]),
+                        str(spectrum_dict["field_drift[V/cm]"]),
+                        str(xyz),
+                        str(seed)])
+                    cmd_list.append(cmd_string)
 
     ### looping over all commands and executing them
     for k, cmd_string in enumerate(cmd_list):
