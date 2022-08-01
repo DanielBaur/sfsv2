@@ -16,6 +16,7 @@ from scipy.integrate import quad
 import math
 import matplotlib.pyplot as plt
 import wimprates
+import os
 
 
 
@@ -28,6 +29,7 @@ import wimprates
 
 # paths and files: NEST installation
 abspath_nest_installation = "/home/daniel/Desktop/arbeitsstuff/sfs/nest_v_2_3_9/"
+abspath_nest_installation = os.getenv('ABSPATH_NEST_INSTALLATION')
 abspath_nest_installation_install = abspath_nest_installation +"install/"
 abspath_nest_installation_build = abspath_nest_installation +"build/"
 abspath_nest_installation_nest = abspath_nest_installation +"nest/"
