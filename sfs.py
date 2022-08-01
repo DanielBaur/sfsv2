@@ -1300,7 +1300,7 @@ def give_spectrum_dict(
     spectrum_name,
     recoil_energy_kev_list,
     # 
-    abspath_spectra_files = abspath_sfs_repo_resources,
+    abspath_spectra_files,
     exposure_t_y = 40*5,
     num_events = -1,
     # nest parameters
@@ -1448,6 +1448,7 @@ def give_spectrum_dict(
 
 def gen_spectrum_plot(
     spectra_list, # list of 'spectra_dict' keys, e.g., ["nr_wimps", "nr_atm", "nr_dsnb"]
+    abspath_spectra_files,
     # plot parameters
     plot_fontsize_axis_label = 11,
     plot_figure_size_x_inch = 5.670,
@@ -1522,7 +1523,10 @@ def gen_spectrum_plot(
                     x_data_recoil_energy_kev = np.linspace(start=0.01, stop=100.01, num=x_data_size, endpoint=True)
                 else:
                     x_data_recoil_energy_kev =  np.linspace(start=plot_xlim[0], stop=plot_xlim[1], num=x_data_size, endpoint=True)
-            spectrum_dict = give_spectrum_dict(spectrum_name=spectrum, recoil_energy_kev_list=x_data_recoil_energy_kev)
+            spectrum_dict = give_spectrum_dict(
+                spectrum_name = spectrum,
+                recoil_energy_kev_list = x_data_recoil_energy_kev,
+                abspath_spectra_files = abspath_spectra_files,)
             plot_x_data = spectrum_dict["recoil_energy_kev_list"]
             plot_y_data = spectrum_dict["differential_recoil_rate_events_t_y_kev"]
 
