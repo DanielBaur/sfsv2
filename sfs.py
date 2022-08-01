@@ -1589,7 +1589,7 @@ def gen_spectrum_plot(
 
 
 ############################################
-### NEST interfacing
+### Executing NEST
 ############################################
 
 
@@ -1995,6 +1995,86 @@ def execNEST(
 
     return execNEST_output_ndarray
 
+
+def gen_signature_plot(
+    signature_list, # list of signature ndarrays to be plotted onto the canvas
+    abspath_spectra_files,
+    # plot parameters
+    plot_fontsize_axis_label = 11,
+    plot_figure_size_x_inch = 5.670,
+    plot_aspect_ratio = 9/16,
+    plot_log_y_axis = False,
+    plot_log_x_axis = False,
+    plot_xlim = [],
+    plot_ylim = [],
+    plot_axes_units = ["cs2_over_cs1_vs_cs1_over_g1"][0],
+    plot_legend = True,
+    plot_legend_bbox_to_anchor = [0.45, 0.63, 0.25, 0.25],
+    plot_legend_labelspacing = 0.5,
+    plot_legend_fontsize = 9,
+    # flags
+    flag_output_abspath_list = [],
+    flag_output_filename = "signature_plot.png",
+    flag_profile = ["default"][0],
+    flag_verbose = False,
+):
+
+    """
+    This function is used to generate a plot displaying all signatures specified in 'signature_list'.
+    """
+
+    # initialization
+    fn = "gen_signature_plot"
+    if flag_verbose: print(f"{fn}: initializing")
+
+    # setting up the canvas
+    if flag_verbose: print(f"{fn}: setting up canvas and axes")
+    fig = plt.figure(
+        figsize = [plot_figure_size_x_inch, plot_figure_size_x_inch*plot_aspect_ratio],
+        dpi = 150,
+        constrained_layout = True) 
+
+    # axes
+    ax1 = fig.add_subplot()
+#    if plot_log_y_axis: ax1.set_yscale('log')
+#    if plot_log_x_axis: ax1.set_xscale('log')
+
+    # looping over all specified spectra
+    for signature in signature_list:
+
+
+        # plotting the current signature
+#        ax1.plot(
+#            plot_x_data,
+#            plot_y_data,
+#            label = spectrum_dict["latex_label"],
+#            linestyle = spectrum_dict["linestyle"],
+#            linewidth = spectrum_dict["linewidth"],
+#            zorder = spectrum_dict["zorder"],
+#            color = spectrum_dict["color"],)
+
+    # shading the WIMP EROI
+#    if flag_shade_wimp_eroi != []:
+#        ax1.axvspan(
+#            flag_shade_wimp_eroi[0],
+#            flag_shade_wimp_eroi[1],
+#            alpha = 0.2,
+#            linewidth = 0,
+#            color = "grey",
+#            zorder = -1)
+
+    # legend
+    if plot_legend : ax1.legend(
+        loc = "center",
+        labelspacing = plot_legend_labelspacing,
+        fontsize = plot_legend_fontsize,
+        bbox_to_anchor = plot_legend_bbox_to_anchor,
+        bbox_transform = ax1.transAxes,)
+
+    # saving
+    plt.show()
+    for abspath in flag_output_abspath_list:
+        fig.savefig(abspath +flag_output_filename)
 
 
 
