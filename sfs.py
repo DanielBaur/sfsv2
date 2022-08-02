@@ -1901,7 +1901,7 @@ def execNEST(
                 raise Exception(f"ERROR: len(spectrum_dict['numEvts'])==len(spectrum_dict['E_min[keV]'])==len(spectrum_dict['E_max[keV]'])")
             # looping over all resulting 'cmd_strings'
             for k, num in enumerate(spectrum_dict["numEvts"]):
-                if spectrum_dict["numEvts"][k] > 0: # sometimes you automatically generate spectrum histograms with empty bins
+                if float(spectrum_dict["numEvts"][k]) > 0: # sometimes you automatically generate spectrum histograms with empty bins
                     cmd_string = " ".join([
                         abspathfile_execNEST_binary,
                         str(spectrum_dict["numEvts"][k]),
@@ -1984,10 +1984,11 @@ def execNEST(
             else:
                 continue
         execNEST_output_tuple_list += this_nest_run_tuple_list
-        num = int(spectrum_dict["numEvts"][k]) if hasattr(spectrum_dict["numEvts"], "__len__") else int(spectrum_dict["numEvts"])
-        e_min = str(spectrum_dict["E_min[keV]"][k]) if hasattr(spectrum_dict["E_min[keV]"], "__len__") else int(spectrum_dict["E_min[keV]"])
-        e_max = str(spectrum_dict["E_max[keV]"][k]) if hasattr(spectrum_dict["E_max[keV]"], "__len__") else int(spectrum_dict["E_max[keV]"])
-        if len(this_nest_run_tuple_list) != num: raise Exception(f"This NEST run yielded {len(this_nest_run_tuple_list)} events instead of the specified {num} at E_min={e_min} and E_max={max}.")
+        #num = int(spectrum_dict["numEvts"][k]) if hasattr(spectrum_dict["numEvts"], "__len__") else int(spectrum_dict["numEvts"])
+        #num = cmd_string
+        #e_min = str(spectrum_dict["E_min[keV]"][k]) if hasattr(spectrum_dict["E_min[keV]"], "__len__") else int(spectrum_dict["E_min[keV]"])
+        #e_max = str(spectrum_dict["E_max[keV]"][k]) if hasattr(spectrum_dict["E_max[keV]"], "__len__") else int(spectrum_dict["E_max[keV]"])
+        #if len(this_nest_run_tuple_list) != num: raise Exception(f"This NEST run yielded {len(this_nest_run_tuple_list)} events instead of the specified {num} at E_min={e_min} and E_max={max}.")
 
     ### casting the 'execNEST_output_tuple_list' into a ndarray
     if flag_verbose: print(f"{fn}: casting 'execNEST_output_tuple_list' into numpy ndarray")
