@@ -31,7 +31,7 @@ class example__detector__darwin_test_detector : public VDetector {
             noiseLinear[1]       =   0.0;
             g1_gas               =   0.1;
             s2Fano               =   3.6;
-            s2_thr               =   100;
+            s2_thr               =   -100;
             E_gas                =   10.0;
             eLife_us             =   5000.0;
             T_Kelvin             =   175.0;

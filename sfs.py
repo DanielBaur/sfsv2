@@ -1814,6 +1814,9 @@ def execNEST(
     abspathfile_execNEST_binary = abspathfile_nest_installation_execNEST_bin, # string, abspathfile of the 'execNEST' executiable generated in the 'install' NEST folder
     flag_verbose = False, # bool, flag indicating whether the print-statements are being printed
     flag_print_stdout_and_stderr = False, # bool, flag indicating whether the 'stdout' and 'stderr' values returned by executing the 'execNEST' C++ executable are being printed
+    flag_min_selection_fraction = 0.05, # float, minimum number of events with non-negative S1 or S2 signal
+    flag_sign_flip = [False,True][1], # string, how to handle negative-flagged NEST output
+    flag_event_selection = ["remove_-1e-6_events"][0], # string, "remove_-1e-6_events" removes all events with -1e-6 values
 ):
 
     """
@@ -1974,12 +1977,16 @@ def execNEST(
             execNEST_dtype = np.dtype(dtype_list)
 
         # extracting the NEST output
-        if flag_verbose: print(f"{fn}: writing the NEST output into an ndarray")
+        if flag_verbose: print(f"{fn}: writing the NEST output into tuple list")
         this_nest_run_tuple_list = []
         for line in stdout.split("\n"):
             line_list = list(line.split("\t"))
             if len(line_list) == 12 and "Nph" not in line:
-                execNEST_output_tuple = tuple(line_list)
+                if flag_sign_flip == True:
+                    execNEST_output_sign_flipped_list = [np.sqrt((float(val))**2) if "," not in val else val for val in line_list]
+                    execNEST_output_tuple = tuple(execNEST_output_sign_flipped_list)
+                else:
+                    execNEST_output_tuple = tuple(line_list)
                 this_nest_run_tuple_list.append(execNEST_output_tuple)
             else:
                 continue
@@ -1990,92 +1997,145 @@ def execNEST(
         #e_max = str(spectrum_dict["E_max[keV]"][k]) if hasattr(spectrum_dict["E_max[keV]"], "__len__") else int(spectrum_dict["E_max[keV]"])
         #if len(this_nest_run_tuple_list) != num: raise Exception(f"This NEST run yielded {len(this_nest_run_tuple_list)} events instead of the specified {num} at E_min={e_min} and E_max={max}.")
 
-    ### casting the 'execNEST_output_tuple_list' into a ndarray
+    # casting the 'execNEST_output_tuple_list' into a ndarray
     if flag_verbose: print(f"{fn}: casting 'execNEST_output_tuple_list' into numpy ndarray")
     execNEST_output_ndarray = np.array(execNEST_output_tuple_list, execNEST_dtype)
+
+    # removing negative-flagged events from output
+    if flag_event_selection == "remove_-1e-6_events":
+        if flag_verbose: print(f"{fn}: removing -1e-6-flagged events")
+        len_total = len(execNEST_output_ndarray)
+        execNEST_output_ndarray = execNEST_output_ndarray[
+            ((execNEST_output_ndarray["S1_3Dcor [phd]"] < -1e-06) |
+            (execNEST_output_ndarray["S1_3Dcor [phd]"] > 1e-06)) &
+            ((execNEST_output_ndarray["S2_3Dcorr [phd]"] < -1e-06) |
+            (execNEST_output_ndarray["S2_3Dcorr [phd]"] > 1e-06))
+        ]
+        len_selected = len(execNEST_output_ndarray)
+        if flag_verbose: print(f"\tselected {len_selected} out of {len_total} events")
+        selection_fraction = len_selected/len_total
+        if selection_fraction < flag_min_selection_fraction:
+            raise Exception(f"ERROR: 'selection_fraction' = {selection_fraction} < {flag_min_selection_fraction} = 'flag_min_selection_fraction'")
 
     return execNEST_output_ndarray
 
 
-#def gen_signature_plot(
-#    signature_list, # list of signature ndarrays to be plotted onto the canvas
-#    abspath_spectra_files,
-#    # plot parameters
-#    plot_fontsize_axis_label = 11,
-#    plot_figure_size_x_inch = 5.670,
-#    plot_aspect_ratio = 9/16,
-#    plot_log_y_axis = False,
-#    plot_log_x_axis = False,
-#    plot_xlim = [],
-#    plot_ylim = [],
-#    plot_axes_units = ["cs2_over_cs1_vs_cs1_over_g1"][0],
-#    plot_legend = True,
-#    plot_legend_bbox_to_anchor = [0.45, 0.63, 0.25, 0.25],
-#    plot_legend_labelspacing = 0.5,
-#    plot_legend_fontsize = 9,
-#    # flags
-#    flag_output_abspath_list = [],
-#    flag_output_filename = "signature_plot.png",
-#    flag_profile = ["default"][0],
-#    flag_verbose = False,
-#):
+def gen_signature_plot(
+    signature_dict_list, # list of signature ndarrays to be plotted onto the canvas
+    detector_dict,
+    # plot parameters
+    plot_fontsize_axis_label = 11,
+    plot_figure_size_x_inch = 5.670,
+    plot_aspect_ratio = 9/16,
+    plot_log_y_axis = False,
+    plot_log_x_axis = False,
+    plot_xlim = [],
+    plot_ylim = [],
+    plot_axes_units = ["cs2_over_cs1_vs_cs1_over_g1"][0],
+    plot_legend = False,
+    plot_legend_bbox_to_anchor = [0.45, 0.63, 0.25, 0.25],
+    plot_legend_labelspacing = 0.5,
+    plot_legend_fontsize = 9,
+    plot_energy_contours = [],
+    # flags
+    flag_output_abspath_list = [],
+    flag_output_filename = "signature_plot.png",
+    flag_profile = ["default"][0],
+    flag_verbose = False,
+):
 
-#    """
-#    This function is used to generate a plot displaying all signatures specified in 'signature_list'.
-#    """
+    """
+    This function is used to generate a plot displaying all signatures specified in 'signature_list'.
+    """
 
-#    # initialization
-#    fn = "gen_signature_plot"
-#    if flag_verbose: print(f"{fn}: initializing")
+    # initialization
+    fn = "gen_signature_plot"
+    if flag_verbose: print(f"{fn}: initializing")
 
-#    # setting up the canvas
-#    if flag_verbose: print(f"{fn}: setting up canvas and axes")
-#    fig = plt.figure(
-#        figsize = [plot_figure_size_x_inch, plot_figure_size_x_inch*plot_aspect_ratio],
-#        dpi = 150,
-#        constrained_layout = True) 
+    # canvas
+    if flag_verbose: print(f"{fn}: setting up canvas and axes")
+    fig = plt.figure(
+        figsize = [plot_figure_size_x_inch, plot_figure_size_x_inch*plot_aspect_ratio],
+        dpi = 150,
+        constrained_layout = True) 
 
-#    # axes
-#    ax1 = fig.add_subplot()
-##    if plot_log_y_axis: ax1.set_yscale('log')
-##    if plot_log_x_axis: ax1.set_xscale('log')
+    # axes
+    ax1 = fig.add_subplot()
+    if plot_log_y_axis: ax1.set_yscale('log')
+    if plot_log_x_axis: ax1.set_xscale('log')
+    if plot_axes_units == "cs2_over_cs1_vs_cs1_over_g1":
+        ax1.set_xlabel(r"$\frac{\mathrm{c}S_1}{g_1}$ / $\text{primary photons}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_ylabel(r"$\frac{\mathrm{c}S_2}{\mathrm{c}S_1}$", fontsize=plot_fontsize_axis_label)
+    elif plot_axes_units == "cs2_vs_cs1":
+        ax1.set_xlabel(r"$\mathrm{c}S_1$ / $\mathrm{phd}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_ylabel(r"$\mathrm{c}S_2$ / $\mathrm{phd}$", fontsize=plot_fontsize_axis_label)
 
-#    # looping over all specified spectra
-#    for signature in signature_list:
+    # defining default scatter format
+    default_scatter_format_dict = {
+        "alpha" : 1,
+        "zorder" : 1,
+        "marker" : "o", # markerstyle, see: https://matplotlib.org/stable/api/markers_api.html#module-matplotlib.markers
+        "linewidths" : 0.0,
+        "s" : 2,
+        "edgecolors" : "black",
+        "facecolors" : "red",
+        "linestyles" : "-",}
+
+    # plotting
+    if flag_verbose: print(f"{fn}: plotting")
+    for signature_dict in signature_dict_list:
+        if flag_verbose: print(f"{fn}: plotting {signature_dict['label']}")
+
+        # selecting the data to be plotted
+        data = signature_dict["signature_ndarray"]
+        x_data = data["S1_3Dcor [phd]"]
+        y_data = data["S2_3Dcorr [phd]"]
+        print(np.min(x_data))
+        print(np.max(x_data))
+        print(np.min(y_data))
+        print(np.max(y_data))
+        if plot_axes_units == "cs2_over_cs1_vs_cs1_over_g1":
+            plot_x_data = [cs1/float(detector_dict["g1"]) for cs1 in x_data]
+            plot_y_data = [y_data[k]/x_data[k] for k in range(len(x_data))]
+        elif plot_axes_units == "cs2_vs_cs1":
+            plot_x_data = x_data
+            plot_y_data = y_data
+
+        # formatting the current signature
+        format_dict = default_scatter_format_dict.copy()
+        for key in [k for k in [*signature_dict] if k not in ["signature_ndarray", "latex_label"]]:
+            format_dict.update({key : signature_dict[key]})
+        print(format_dict)
+
+        # plotting the current signature
+        ax1.scatter( plot_x_data, plot_y_data, **format_dict)
 
 
-#        # plotting the current signature
-##        ax1.plot(
-##            plot_x_data,
-##            plot_y_data,
-##            label = spectrum_dict["latex_label"],
-##            linestyle = spectrum_dict["linestyle"],
-##            linewidth = spectrum_dict["linewidth"],
-##            zorder = spectrum_dict["zorder"],
-##            color = spectrum_dict["color"],)
+    # shading the WIMP EROI
+#    if flag_shade_wimp_eroi != []:
+#        ax1.axvspan(
+#            flag_shade_wimp_eroi[0],
+#            flag_shade_wimp_eroi[1],
+#            alpha = 0.2,
+#            linewidth = 0,
+#            color = "grey",
+#            zorder = -1)
 
-#    # shading the WIMP EROI
-##    if flag_shade_wimp_eroi != []:
-##        ax1.axvspan(
-##            flag_shade_wimp_eroi[0],
-##            flag_shade_wimp_eroi[1],
-##            alpha = 0.2,
-##            linewidth = 0,
-##            color = "grey",
-##            zorder = -1)
+    # legend
+    if flag_verbose: print(f"{fn}: legend")
+    if plot_legend : ax1.legend(
+        loc = "center",
+        labelspacing = plot_legend_labelspacing,
+        fontsize = plot_legend_fontsize,
+        bbox_to_anchor = plot_legend_bbox_to_anchor,
+        bbox_transform = ax1.transAxes,)
 
-#    # legend
-#    if plot_legend : ax1.legend(
-#        loc = "center",
-#        labelspacing = plot_legend_labelspacing,
-#        fontsize = plot_legend_fontsize,
-#        bbox_to_anchor = plot_legend_bbox_to_anchor,
-#        bbox_transform = ax1.transAxes,)
-
-#    # saving
-#    plt.show()
-#    for abspath in flag_output_abspath_list:
-#        fig.savefig(abspath +flag_output_filename)
+    # saving
+    if flag_verbose: print(f"{fn}: saving")
+    plt.show()
+    for abspath in flag_output_abspath_list:
+        fig.savefig(abspath +flag_output_filename)
+    return
 
 
 
