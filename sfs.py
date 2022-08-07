@@ -228,6 +228,7 @@ color_be7_default = "green"
 color_b8_default = "red"
 color_atm_default = "purple"
 color_dsnb_default =  "brown"
+color_radiogenic_neutrons_default = "gray"
 color_nunubetabeta_default = "olive"
 
 
@@ -1165,6 +1166,54 @@ spectrum_dict_default_dict = {
         "zorder"                                : 1,
         "differential_rate_computation"         : "interpolation_from_file",
     },
+    "nr_neutrons_baseline"                      : {
+        "latex_label"                           : r"radiogenic neutrons (baseline)",
+        "color"                                 : color_radiogenic_neutrons_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "mc_output",
+    },
+    "nr_neutrons_less_cryostat"                      : {
+        "latex_label"                           : r"radiogenic neutrons (better cryostat)",
+        "color"                                 : color_radiogenic_neutrons_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "mc_output",
+    },
+    "nr_neutrons_less_ptfe_pmt"                      : {
+        "latex_label"                           : r"radiogenic neutrons (better PTFE and PMTs)",
+        "color"                                 : color_radiogenic_neutrons_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "mc_output",
+    },
+    "nr_neutrons_34t"                           : {
+        "latex_label"                           : r"radiogenic neutrons (34t FV)",
+        "color"                                 : color_radiogenic_neutrons_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "mc_output",
+    },
+    "nr_neutrons_28t"                           : {
+        "latex_label"                           : r"radiogenic neutrons (28t FV)",
+        "color"                                 : color_radiogenic_neutrons_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "mc_output",
+    },
+    "nr_neutrons_20t"                           : {
+        "latex_label"                           : r"radiogenic neutrons (20t FV)",
+        "color"                                 : color_radiogenic_neutrons_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "mc_output",
+    },
     "er_pp"		                                : {
         "latex_label"                           : r"pp",
         "color"                                 : color_pp_default,
@@ -1223,6 +1272,14 @@ spectrum_dict_default_dict = {
         "differential_rate_parameters"          : {
             "abundance_xe136"                   : 0.08857,
         },
+    },
+    "er_rn222"                                  : {
+        "latex_label"                           : r"naked $^{214}\mathrm{Pb}$ betas ($0.1\,\mathrm{\frac{\upmu Bq}{kg}}$ of $^{222}\mathrm{Rn}$)",
+        "color"                                 : color_ers_default,
+        "linestyle"                             : "--",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "mc_output",
     },
 }
 
@@ -1286,6 +1343,22 @@ spectrum_dict_default_dict.update({
         "constituent_spectra_list"              : ["er_be7_384", "er_be7_861", "er_o15", "er_n13", "er_nunubetabeta", "er_pp"],
     },
 })
+
+
+def give_differential_rate_for_mc_output(
+    recoil_energy_kev,
+    xp,
+    fp,
+    left,
+    right,
+):
+    if recoil_energy_kev < xp[0]:
+        return left
+    elif recoil_energy_kev > xp[-1]:
+        return right
+    else:
+        index = np.argmin(np.abs(np.array(xp)-recoil_energy_kev))
+        return fp[index]
 
 
 def give_spectrum_dict(
@@ -1392,6 +1465,10 @@ def give_spectrum_dict(
         if spectrum_dict["differential_rate_computation"] == "interpolation_from_file":
             digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_files +spectrum_name +".csv")
             differential_rate_function = np.interp
+            differential_rate_param_dict = {"xp" : digitized_spectrum_ndarray["x_data"], "fp" : digitized_spectrum_ndarray["y_data"], "left" : 0, "right" : 0}
+        elif spectrum_dict["differential_rate_computation"] == "mc_output":
+            digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_files +spectrum_name +".csv")
+            differential_rate_function = give_differential_rate_for_mc_output
             differential_rate_param_dict = {"xp" : digitized_spectrum_ndarray["x_data"], "fp" : digitized_spectrum_ndarray["y_data"], "left" : 0, "right" : 0}
         elif callable(spectrum_dict["differential_rate_computation"]):
             differential_rate_function = spectrum_dict["differential_rate_computation"]
