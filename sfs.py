@@ -1302,6 +1302,8 @@ def give_spectrum_dict(
     # flags
     flag_spectrum_type = ["differential", "integral"][0],
     flag_verbose = False,
+    flag_return_non_integer_events = False,
+    flag_inhibit_scaling = False,
     # keywords
     spectrum_dict_default_values = spectrum_dict_default_dict, # default 'spectrum_dict' values
     **kwargs, # additional keyword argument values overwriting those from 'spectrum_dict_default_values'
@@ -1352,6 +1354,8 @@ def give_spectrum_dict(
                 xyz_pos_mm = xyz_pos_mm,
                 flag_spectrum_type = flag_spectrum_type,
                 flag_verbose = flag_verbose,
+                flag_return_non_integer_events = True,
+                flag_inhibit_scaling = True,
                 spectrum_dict_default_values = spectrum_dict_default_values,
                 **kwargs,
             ))
@@ -1363,6 +1367,11 @@ def give_spectrum_dict(
                 "differential_recoil_rate_events_t_y_kev" : y_data_summed})
         elif spectrum_dict["flag_spectrum_type"] == "integral":
             y_data_summed = compute_array_sum([csd["numEvts"] for csd in constituent_spectrum_dict_list])
+            if num_events > 0:
+                total = np.sum(y_data_summed)
+                num_scale_factor = num_events/total
+                y_data_summed = [num_scale_factor*noe for noe in y_data_summed]
+            y_data_summed = [round(noe) for noe in y_data_summed]
             spectrum_dict.update({
                 "numEvts"               : list(y_data_summed),
                 "type_interaction"      : str(constituent_spectrum_dict_list[0]["type_interaction"]),
@@ -1414,12 +1423,13 @@ def give_spectrum_dict(
             # scaling the integrated number of events either according to 'exposure_t_y' or to 'num_events'
             if num_events <= 0:
                 number_of_events_per_energy_bin = [noe*exposure_t_y for noe in number_of_events_per_energy_bin]
-            else:
+            elif num_events > 0 and flag_inhibit_scaling == False:
                 total = np.sum(number_of_events_per_energy_bin)
                 num_scale_factor = num_events/total
                 number_of_events_per_energy_bin = [num_scale_factor*noe for noe in number_of_events_per_energy_bin]
             # rounding the entries of 'number_of_events_per_energy_bin' to integer values:
-            number_of_events_per_energy_bin = [int(noe) for noe in number_of_events_per_energy_bin]
+            if flag_return_non_integer_events == False:
+                number_of_events_per_energy_bin = [round(noe) for noe in number_of_events_per_energy_bin]
             # updating the 'spectrum_dict'
             if flag_verbose: print(f"{fn}: computing the integrated rate")
             spectrum_dict.update({
@@ -1991,11 +2001,10 @@ def execNEST(
             else:
                 continue
         execNEST_output_tuple_list += this_nest_run_tuple_list
-        #num = int(spectrum_dict["numEvts"][k]) if hasattr(spectrum_dict["numEvts"], "__len__") else int(spectrum_dict["numEvts"])
-        #num = cmd_string
-        #e_min = str(spectrum_dict["E_min[keV]"][k]) if hasattr(spectrum_dict["E_min[keV]"], "__len__") else int(spectrum_dict["E_min[keV]"])
-        #e_max = str(spectrum_dict["E_max[keV]"][k]) if hasattr(spectrum_dict["E_max[keV]"], "__len__") else int(spectrum_dict["E_max[keV]"])
-        #if len(this_nest_run_tuple_list) != num: raise Exception(f"This NEST run yielded {len(this_nest_run_tuple_list)} events instead of the specified {num} at E_min={e_min} and E_max={max}.")
+        num = int(list(cmd_string.split(" "))[1])
+        e_min = float(list(cmd_string.split(" "))[3])
+        e_max = float(list(cmd_string.split(" "))[3])
+        if len(this_nest_run_tuple_list) != num: raise Exception(f"This NEST run yielded {len(this_nest_run_tuple_list)} events instead of the specified {num} at E_min={e_min} and E_max={max}.")
 
     # casting the 'execNEST_output_tuple_list' into a ndarray
     if flag_verbose: print(f"{fn}: casting 'execNEST_output_tuple_list' into numpy ndarray")
@@ -2063,6 +2072,7 @@ def gen_signature_plot(
     plot_legend_labelspacing = 0.5,
     plot_legend_fontsize = 9,
     plot_energy_contours = [],
+    plot_text_dict_list = [],
     # flags
     flag_output_abspath_list = [],
     flag_output_filename = "signature_plot.png",
@@ -2092,13 +2102,13 @@ def gen_signature_plot(
     if plot_xlim != [] : ax1.set_xlim(plot_xlim)
     if plot_ylim != [] : ax1.set_ylim(plot_ylim)
     if plot_axes_units == "cs2_over_cs1_vs_cs1_over_g1":
-        ax1.set_xlabel(r"$\frac{\mathrm{c}S_1}{g_1}$ / $\text{primary photons}$", fontsize=plot_fontsize_axis_label)
-        ax1.set_ylabel(r"$\frac{\mathrm{c}S_2}{\mathrm{c}S_1}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_xlabel(r"$\frac{\mathrm{c}S_1}{g_1}$ / $\text{number of primary photons}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_ylabel(r"$\frac{\mathrm{c}S_2}{\mathrm{c}S_1}$ / $\mathrm{\frac{phd}{phd}}$", fontsize=plot_fontsize_axis_label)
     elif plot_axes_units == "cs2_vs_cs1":
         ax1.set_xlabel(r"$\mathrm{c}S_1$ / $\mathrm{phd}$", fontsize=plot_fontsize_axis_label)
         ax1.set_ylabel(r"$\mathrm{c}S_2$ / $\mathrm{phd}$", fontsize=plot_fontsize_axis_label)
 
-    # defining default scatter format
+    # defining defbbault scatter format
     default_scatter_format_dict = {
         "alpha" : 1,
         "zorder" : 1,
@@ -2153,16 +2163,18 @@ def gen_signature_plot(
             horizontalalignment = "left",
             verticalalignment = "bottom",)
 
-
-    # shading the WIMP EROI
-#    if flag_shade_wimp_eroi != []:
-#        ax1.axvspan(
-#            flag_shade_wimp_eroi[0],
-#            flag_shade_wimp_eroi[1],
-#            alpha = 0.2,
-#            linewidth = 0,
-#            color = "grey",
-#            zorder = -1)
+    # text annotations
+    default_text_format_dict = {
+        "horizontalalignment" : "center",
+        "verticalalignment"   : "center",
+        "zorder"              : 1,
+        "color"               : "black",
+        "fontsize"            : 11,
+        "transform"           : ax1.transAxes}
+    for text_dict in plot_text_dict_list:
+        text_annotation_dict = default_text_format_dict.copy()
+        text_annotation_dict.update(text_dict)
+        ax1.text(**text_annotation_dict)
 
     # legend
     if flag_verbose: print(f"{fn}: legend")
@@ -2194,10 +2206,7 @@ def gen_signature_plot(
 def calc_er_nr_discrimination_line(
     er_spectrum,
     nr_spectrum,
-
-    g1, #photoelectrons per photon
-    g2, # photons per electron
-    w, #eV
+    detector_dict,
     min_energy, #in keV
     max_energy, # in keV
     bin_size, #in keV, not exceeding max_energy
@@ -2211,6 +2220,9 @@ def calc_er_nr_discrimination_line(
     #Bins are centerd around the entries in the energy_bins array.
 
     if verbose: print("calc_er_nr_discrimination_line running.")
+    w = 13.6
+    g1 = detector_dict["g1"]
+    g2 = compute_g2_from_detector_configuration(detector_dict)
     energy_bins = [min_energy + bin_size/2]
     bin_edges = [min_energy]
     while energy_bins[-1]+bin_size*3/2<=max_energy:
