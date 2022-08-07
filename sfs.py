@@ -2020,6 +2020,32 @@ def execNEST(
     return execNEST_output_ndarray
 
 
+def convert_from_s2_vs_s1_to_s2_over_s1_vs_s1_over_g1(
+    s1_array,
+    s2_array,
+    detector_dict,
+):
+    s2_over_s1_array  = [s2_array[k]/s1_array[k] for k in range(len(s1_array))]
+    s1_over_g1_array = [s1/float(detector_dict["g1"]) for s1 in s1_array]
+    return s1_over_g1_array, s2_over_s1_array
+
+
+def energy_contour_line_in_s2_over_s1(
+    recoil_energy_kev_ee,
+    detector_dict,
+    n_samples = 100
+):
+    """
+    This function is used to compute two arrays resembling an energy contour line plottable in a signature plot (E = W(s1/g1 +s2/g2)).
+    """
+    w_old = 13.6*0.001 # conversion to kev
+    g1 = detector_dict["g1"]
+    g2 = compute_g2_from_detector_configuration(detector_dict)
+    energy_contour_s1 = list(np.linspace(start=0.0001, stop=recoil_energy_kev_ee/w_old*g1, endpoint=True, num=n_samples))
+    energy_contour_s2 = [(recoil_energy_kev_ee/w_old-s1/g1)*g2 for s1 in energy_contour_s1]
+    return energy_contour_s1, energy_contour_s2
+
+
 def gen_signature_plot(
     signature_dict_list, # list of signature ndarrays to be plotted onto the canvas
     detector_dict,
@@ -2063,6 +2089,8 @@ def gen_signature_plot(
     ax1 = fig.add_subplot()
     if plot_log_y_axis: ax1.set_yscale('log')
     if plot_log_x_axis: ax1.set_xscale('log')
+    if plot_xlim != [] : ax1.set_xlim(plot_xlim)
+    if plot_ylim != [] : ax1.set_ylim(plot_ylim)
     if plot_axes_units == "cs2_over_cs1_vs_cs1_over_g1":
         ax1.set_xlabel(r"$\frac{\mathrm{c}S_1}{g_1}$ / $\text{primary photons}$", fontsize=plot_fontsize_axis_label)
         ax1.set_ylabel(r"$\frac{\mathrm{c}S_2}{\mathrm{c}S_1}$", fontsize=plot_fontsize_axis_label)
@@ -2088,27 +2116,42 @@ def gen_signature_plot(
 
         # selecting the data to be plotted
         data = signature_dict["signature_ndarray"]
-        x_data = data["S1_3Dcor [phd]"]
-        y_data = data["S2_3Dcorr [phd]"]
-        print(np.min(x_data))
-        print(np.max(x_data))
-        print(np.min(y_data))
-        print(np.max(y_data))
         if plot_axes_units == "cs2_over_cs1_vs_cs1_over_g1":
-            plot_x_data = [cs1/float(detector_dict["g1"]) for cs1 in x_data]
-            plot_y_data = [y_data[k]/x_data[k] for k in range(len(x_data))]
+            plot_x_data, plot_y_data = convert_from_s2_vs_s1_to_s2_over_s1_vs_s1_over_g1(data["S1_3Dcor [phd]"], data["S2_3Dcorr [phd]"], detector_dict)
         elif plot_axes_units == "cs2_vs_cs1":
-            plot_x_data = x_data
-            plot_y_data = y_data
+            plot_x_data = data["S1_3Dcor [phd]"]
+            plot_y_data = data["S2_3Dcorr [phd]"]
 
         # formatting the current signature
         format_dict = default_scatter_format_dict.copy()
         for key in [k for k in [*signature_dict] if k not in ["signature_ndarray", "latex_label"]]:
             format_dict.update({key : signature_dict[key]})
-        print(format_dict)
 
         # plotting the current signature
         ax1.scatter( plot_x_data, plot_y_data, **format_dict)
+
+    # plotting the energy contour lines
+    for recoil_energy_kev_ee in plot_energy_contours:
+        plot_energy_contour_x, plot_energy_contour_y = energy_contour_line_in_s2_over_s1(recoil_energy_kev_ee, detector_dict)
+        if plot_axes_units == "cs2_over_cs1_vs_cs1_over_g1":
+            plot_energy_contour_x, plot_energy_contour_y = convert_from_s2_vs_s1_to_s2_over_s1_vs_s1_over_g1(plot_energy_contour_x, plot_energy_contour_y, detector_dict)
+        ax1.plot(
+            plot_energy_contour_x,
+            plot_energy_contour_y,
+            color = "black",
+            linewidth = 0.5,
+            linestyle = "-",
+            zorder = 5,)
+        index = np.argmin(np.abs(np.array(plot_energy_contour_y)-plot_ylim[0]))
+        ax1.text(
+            x = (ax1.transAxes + ax1.transData.inverted()).inverted().transform([plot_energy_contour_x[index],1])[0],
+            y = 0.024,
+            s = r"$" +f"{recoil_energy_kev_ee:.1f}" +"\,\mathrm{keV}_{\mathrm{ee}}$",
+            transform = ax1.transAxes,
+            fontsize = 8,
+            color = "black",
+            horizontalalignment = "left",
+            verticalalignment = "bottom",)
 
 
     # shading the WIMP EROI
