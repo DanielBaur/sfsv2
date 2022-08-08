@@ -1094,42 +1094,10 @@ spectrum_dict_default_dict = {
         "zorder"                                : 1,
         "differential_rate_computation"         : "interpolation_from_file",
     },
-    "nr_pp"		                                : {
-        "latex_label"                           : r"pp",
-        "color"                                 : color_pp_default,
-        "linestyle"                             : "-",
-        "linewidth"                             : 1,
-        "zorder"                                : 1,
-        "differential_rate_computation"         : "interpolation_from_file",
-    },
-    "nr_pep"		                            : {
-        "latex_label"                           : r"pep",
-        "color"                                 : color_pep_default,
-        "linestyle"                             : "-",
-        "linewidth"                             : 1,
-        "zorder"                                : 1,
-        "differential_rate_computation"         : "interpolation_from_file",
-    },
     "nr_b8"		                                : {
         "latex_label"                           : r"$^{8}\mathrm{B}$",
         "color"                                 : color_b8_default,
         "linestyle"                             : "-",
-        "linewidth"                             : 1,
-        "zorder"                                : 1,
-        "differential_rate_computation"         : "interpolation_from_file",
-    },
-    "nr_be7_384"	                            : {
-        "latex_label"                           : r"$^{7}\mathrm{Be}\,(384\,\mathrm{keV})$",
-        "color"                                 : color_be7_default,
-        "linestyle"                             : "-",
-        "linewidth"                             : 1,
-        "zorder"                                : 1,
-        "differential_rate_computation"         : "interpolation_from_file",
-    },
-    "nr_be7_861"	                            : {
-        "latex_label"                           : r"$^{7}\mathrm{Be}\,(861\,\mathrm{keV})$",
-        "color"                                 : color_be7_default,
-        "linestyle"                             : "--",
         "linewidth"                             : 1,
         "zorder"                                : 1,
         "differential_rate_computation"         : "interpolation_from_file",
@@ -1142,30 +1110,6 @@ spectrum_dict_default_dict = {
         "zorder"                                : 1,
         "differential_rate_computation"         : "interpolation_from_file",
     },
-    "nr_o15"		                            : {
-        "latex_label"                           : r"$^{15}\mathrm{O}$",
-        "color"                                 : color_cno_default,
-        "linestyle"                             : "-",
-        "linewidth"                             : 1,
-        "zorder"                                : 1,
-        "differential_rate_computation"         : "interpolation_from_file",
-    },
-    "nr_f17"		                            : {
-        "latex_label"                           : r"$^{17}\mathrm{F}$",
-        "color"                                 : color_cno_default,
-        "linestyle"                             : "-.",
-        "linewidth"                             : 1,
-        "zorder"                                : 1,
-        "differential_rate_computation"         : "interpolation_from_file",
-    },
-    "nr_n13"		                            : {
-        "latex_label"                           : r"$^{13}\mathrm{N}$",
-        "color"                                 : color_cno_default,
-        "linestyle"                             : "--",
-        "linewidth"                             : 1,
-        "zorder"                                : 1,
-        "differential_rate_computation"         : "interpolation_from_file",
-    },
     "nr_neutrons_baseline"                      : {
         "latex_label"                           : r"radiogenic neutrons (baseline)",
         "color"                                 : color_radiogenic_neutrons_default,
@@ -1174,7 +1118,7 @@ spectrum_dict_default_dict = {
         "zorder"                                : 1,
         "differential_rate_computation"         : "mc_output",
     },
-    "nr_neutrons_less_cryostat"                      : {
+    "nr_neutrons_less_cryostat"                 : {
         "latex_label"                           : r"radiogenic neutrons (better cryostat)",
         "color"                                 : color_radiogenic_neutrons_default,
         "linestyle"                             : "-",
@@ -1182,10 +1126,10 @@ spectrum_dict_default_dict = {
         "zorder"                                : 1,
         "differential_rate_computation"         : "mc_output",
     },
-    "nr_neutrons_less_ptfe_pmt"                      : {
+    "nr_neutrons_less_ptfe_pmt"                 : {
         "latex_label"                           : r"radiogenic neutrons (better PTFE and PMTs)",
         "color"                                 : color_radiogenic_neutrons_default,
-        "linestyle"                             : "-",
+        "linestyle"                             : "--",
         "linewidth"                             : 1,
         "zorder"                                : 1,
         "differential_rate_computation"         : "mc_output",
@@ -1273,7 +1217,7 @@ spectrum_dict_default_dict = {
             "abundance_xe136"                   : 0.08857,
         },
     },
-    "er_rn222"                                  : {
+    "er_rn222"                                  : { # assuming 0.1 uBq/kg
         "latex_label"                           : r"naked $^{214}\mathrm{Pb}$ betas ($0.1\,\mathrm{\frac{\upmu Bq}{kg}}$ of $^{222}\mathrm{Rn}$)",
         "color"                                 : color_ers_default,
         "linestyle"                             : "--",
@@ -1330,7 +1274,7 @@ spectrum_dict_default_dict.update({
         "linewidth"                             : 2,
         "zorder"                                : 2,
         "differential_rate_computation"         : "spectrum_sum",
-        "constituent_spectra_list"              : ["nr_atm", "nr_hep", "nr_atm", "nr_b8", "nr_dsnb"],
+        "constituent_spectra_list"              : ["nr_atm", "nr_hep", "nr_b8", "nr_dsnb", "nr_neutrons_baseline"],
     },
     # This is the combined ER background model used for the SFS study
     "combined_er_background"                    : {
@@ -1340,7 +1284,7 @@ spectrum_dict_default_dict.update({
         "linewidth"                             : 2,
         "zorder"                                : 2,
         "differential_rate_computation"         : "spectrum_sum",
-        "constituent_spectra_list"              : ["er_be7_384", "er_be7_861", "er_o15", "er_n13", "er_nunubetabeta", "er_pp"],
+        "constituent_spectra_list"              : ["er_be7_384", "er_be7_861", "er_nunubetabeta", "er_pp", "er_rn222"],
     },
 })
 
@@ -1465,11 +1409,11 @@ def give_spectrum_dict(
         if spectrum_dict["differential_rate_computation"] == "interpolation_from_file":
             digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_files +spectrum_name +".csv")
             differential_rate_function = np.interp
-            differential_rate_param_dict = {"xp" : digitized_spectrum_ndarray["x_data"], "fp" : digitized_spectrum_ndarray["y_data"], "left" : 0, "right" : 0}
+            differential_rate_param_dict = {"xp" : digitized_spectrum_ndarray["x_data"], "fp" : digitized_spectrum_ndarray["y_data"], "left" : digitized_spectrum_ndarray["y_data"][0], "right" : 0}
         elif spectrum_dict["differential_rate_computation"] == "mc_output":
             digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_files +spectrum_name +".csv")
             differential_rate_function = give_differential_rate_for_mc_output
-            differential_rate_param_dict = {"xp" : digitized_spectrum_ndarray["x_data"], "fp" : digitized_spectrum_ndarray["y_data"], "left" : 0, "right" : 0}
+            differential_rate_param_dict = {"xp" : digitized_spectrum_ndarray["x_data"], "fp" : digitized_spectrum_ndarray["y_data"], "left" : digitized_spectrum_ndarray["y_data"][0], "right" : 0}
         elif callable(spectrum_dict["differential_rate_computation"]):
             differential_rate_function = spectrum_dict["differential_rate_computation"]
             differential_rate_param_dict = spectrum_dict["differential_rate_parameters"]
@@ -1589,7 +1533,7 @@ def gen_spectrum_plot(
 
         # case: generating differential spectrum only from specified string
         if type(spectrum) == str:
-            x_data_size = 301
+            x_data_size = 4801
             if plot_log_x_axis:
                 if plot_xlim==[]:
                     x_data_recoil_energy_kev = np.logspace(start=-2, stop=+2, num=x_data_size, endpoint=True)
@@ -2143,13 +2087,14 @@ def gen_signature_plot(
     plot_log_x_axis = False,
     plot_xlim = [],
     plot_ylim = [],
-    plot_axes_units = ["cs2_over_cs1_vs_cs1_over_g1"][0],
+    plot_axes_units = ["cs2_vs_cs1", "cs2_over_cs1_vs_cs1_over_g1"][1],
     plot_legend = False,
     plot_legend_bbox_to_anchor = [0.45, 0.63, 0.25, 0.25],
     plot_legend_labelspacing = 0.5,
     plot_legend_fontsize = 9,
     plot_energy_contours = [],
     plot_text_dict_list = [],
+    plot_discrimination_line_dict = {},
     # flags
     flag_output_abspath_list = [],
     flag_output_filename = "signature_plot.png",
@@ -2240,7 +2185,23 @@ def gen_signature_plot(
             horizontalalignment = "left",
             verticalalignment = "bottom",)
 
+    # plot discrimination line
+    dl_x_data = plot_discrimination_line_dict["dl_x_data_s1_over_g1"] if plot_axes_units=="cs2_over_cs1_vs_cs1_over_g1" else plot_discrimination_line_dict["dl_x_data_s1"]
+    dl_y_data = plot_discrimination_line_dict["dl_y_data_s2_over_s1"] if plot_axes_units=="cs2_over_cs1_vs_cs1_over_g1" else plot_discrimination_line_dict["dl_y_data_s2"]
+    print(plot_discrimination_line_dict["er_rejection"])
+    ax1.plot(
+        dl_x_data,
+        dl_y_data,
+        linestyle = "-",
+        linewidth = 0.5,
+        color = "black",)
+
+#        "nr_acceptance": float(nr_acceptance),
+#        "er_rejection": float(er_rejection),
+
+
     # text annotations
+    if flag_verbose: print(f"{fn}: text annotations")
     default_text_format_dict = {
         "horizontalalignment" : "center",
         "verticalalignment"   : "center",
@@ -2286,12 +2247,13 @@ def calc_er_nr_discrimination_line(
     detector_dict,
     min_energy, #in keV
     max_energy, # in keV
-    bin_size, #in keV, not exceeding max_energy
+    bin_number, #number of energy-bins
     nr_acceptance = 0.30, # portion of the nr-spectrum below the discrimination line
     approx_depth = 10,# only integers allowed
     # upper bound for errors in the discrimination line is
     # ~ 2**(-approx_depth-1) * (max(nr_spectrum[S2]/nr_spectrum[S1]) - min(nr_spectrum[S2]/nr_spectrum[S1]))
     verbose =True,
+    num_interp_steps = 10, # used for interpolating the discr-line to project it into S1-vs.-S2-space
     ):
     #generate energy bins of size energy_bin_size and an array of the bin edges (energy_bin_edges).
     #Bins are centerd around the entries in the energy_bins array.
@@ -2300,13 +2262,7 @@ def calc_er_nr_discrimination_line(
     w = 13.6
     g1 = detector_dict["g1"]
     g2 = compute_g2_from_detector_configuration(detector_dict)
-    energy_bins = [min_energy + bin_size/2]
-    bin_edges = [min_energy]
-    while energy_bins[-1]+bin_size*3/2<=max_energy:
-        energy_bins.append(energy_bins[-1]+bin_size)
-        bin_edges.append(bin_edges[-1]+bin_size)
-    bin_edges.append(bin_edges[-1]+bin_size)
-
+    bin_edges = np.linspace(min_energy, max_energy, bin_number+1)
 
     dtype = np.dtype([("S2/S1", np.float64)]) #dtype for nr_energies and er_energies numpy arrays
 
@@ -2318,18 +2274,17 @@ def calc_er_nr_discrimination_line(
     #x-data and y-data for the discrimination line
     dl_x_data=[] # cS1/g1 [ph]
     dl_y_data=[] # cS1/cS2
+    dl_S1_data = [] # cS1 [phd]
+    dl_S2_data = [] # cS2 [phd]
 
-    #array contain reconstructed energies for ER- and NR-events (but only accurate for ER)
-    energy_er=w*(er_spectrum_corr["S1_3Dcor [phd]"]/g1 +er_spectrum_corr["S2_3Dcorr [phd]"]/g2)/1000
+    #array containing reconstructed energies for ER- and NR-events (but only accurate for ER)
+    energy_er=w*(er_spectrum["S1_3Dcor [phd]"]/g1 +er_spectrum["S2_3Dcorr [phd]"]/g2)/1000
 
-    energy_nr=w*(nr_spectrum_corr["S1_3Dcor [phd]"]/g1 +nr_spectrum_corr["S2_3Dcorr [phd]"]/g2)/1000
-
-    #plt.hist(energy_er)
-    #plt.hist(energy_nr)
+    energy_nr=w*(nr_spectrum["S1_3Dcor [phd]"]/g1 +nr_spectrum["S2_3Dcorr [phd]"]/g2)/1000
 
     nr_below_dl=np.array([])
     nr_below_dl.dtype = nr_spectrum.dtype
-    for bin_index in range(len(energy_bins)):
+    for bin_index in range(bin_number):
 
         #filter the ER- and NR-events that lie in the current energy-bin.
         er_bin_data =er_spectrum[(energy_er> bin_edges[bin_index])&(energy_er<bin_edges[bin_index+1])]
@@ -2349,7 +2304,7 @@ def calc_er_nr_discrimination_line(
         nr_y.dtype =dtype
         er_y.dtype = dtype
 
-        if len(nr_y)==0 or len(er_y)==0:
+        if len(nr_y)==0:
             #if verbose:
                 #print(f"energy bin [{bin_edges[bin_index]}, {bin_edges[bin_index+1]}] is empty.")
                 #print(len(er_bin_data), len(nr_bin_data))
@@ -2371,23 +2326,32 @@ def calc_er_nr_discrimination_line(
                                                                  # E = w(S1/g1 + S2/g2) is in eV
         dl_x_data.append(1000*bin_edges[bin_index+1]/w/(1+g1/g2*guess))
 
+        dl_interp_x = np.linspace(dl_x_data[-2], dl_x_data[-1],num_interp_steps)
+        for dl_x in dl_interp_x:
+            x_S1 = dl_x*g1
+            y_S2 = guess * x_S1
+            dl_S1_data.append(x_S1)
+            dl_S2_data.append(y_S2)
+
         dl_y_data.append(guess)
         dl_y_data.append(guess)
 
-    er_rejection = total_er_remaining/total_er
+    er_rejection = 1-(total_er_remaining/total_er)
     if verbose:
         print("Total number of ER-events:",total_er)
         print("Total number of NR-events:",total_nr)
         print("Input NR-acceptance:", nr_acceptance)
         print("Actual NR-acceptance:", total_nr_below_discr_line/total_nr)
-        print("Ratio of ER-Events left below the discrimination line:",er_discrimination)
+        print("Ratio of ER-Events left below the discrimination line:",er_rejection)
 
     output_dict = {
-        "dl_x_data_s1_over_g1": dl_x_data,
-        "dl_y_data_s2_over_s1": dl_y_data,
-        "nr_acceptance":nr_acceptance,
-        "er_rejection": er_rejection,
-        "nr_below_dl": nr_below_dl,
+        "dl_x_data_s1_over_g1": list(dl_x_data),
+        "dl_y_data_s2_over_s1": list(dl_y_data),
+        "dl_x_data_s1": list(dl_S1_data),
+        "dl_y_data_s2": list(dl_S2_data),
+        "nr_acceptance": float(nr_acceptance),
+        "er_rejection": float(er_rejection),
+#        "nr_below_dl": list(nr_below_dl),
     }
 
     return output_dict
