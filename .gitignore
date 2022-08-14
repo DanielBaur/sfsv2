@@ -18,7 +18,7 @@ Detector_Xe100t_baseline.hh
 /detectors
 /spectra
 /plots
-/signatures
+#/signatures
 primakoff_rosen_approximation_nunubetabeta.pdf
 convert_rn222_rootfile_to_csv.py
 background_222Rncomp_1keV.root
