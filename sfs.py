@@ -18,6 +18,8 @@ import matplotlib.pyplot as plt
 import wimprates
 import os
 from random import randrange
+import time
+from datetime import timedelta
 
 
 
@@ -2567,18 +2569,19 @@ def er_nr_discrimination_line_loop(
     fn = "er_nr_discrimination_line_loop"
     discrimination_line_dict_dict = {}
     if flag_verbose : print(f"\n{fn}: initializing")
+    start_time = time.time()
 
     # looping over the specified parameter space
-    if flag_verbose : print(f"\n{fn}: looping over parameter space")
+    if flag_verbose : print(f"{fn}: looping over parameter space")
     for k, parameter_value in enumerate(parameter_value_list):
-        if flag_verbose : print(f"\n{fn}: 'parameter_name' = '{parameter_name}', 'parameter_value'='{parameter_value}'")
+        if flag_verbose : print(f"{fn}: 'parameter_name' = '{parameter_name}', 'parameter_value'='{parameter_value}'")
 
         # adapting the detector
         current_detector_dict = baseline_detector_dict.copy()
         current_detector_dict.update({parameter_name : parameter_value})
 
         # executing 'execNEST'
-        if flag_verbose : print(f"\n{fn}: executing 'execNEST'")
+        if flag_verbose : print(f"{fn}: executing 'execNEST'")
         er_spectrum_ndarray = execNEST(
             spectrum_dict = er_spectrum_dict,
             baseline_detector_dict = baseline_detector_dict,
@@ -2597,15 +2600,20 @@ def er_nr_discrimination_line_loop(
             flag_print_stdout_and_stderr = False,)
 
         # computing the 'discrimination_line_dict'
-        if flag_verbose : print(f"\n{fn}: computing 'discrimination_line_dict'")
+        if flag_verbose : print(f"{fn}: computing 'discrimination_line_dict'")
         discrimination_line_dict = calc_er_nr_discrimination_line(
             er_spectrum = er_spectrum_ndarray,
             nr_spectrum = nr_spectrum_ndarray,
             detector_dict = current_detector_dict,
             verbose = flag_verbose,
             **calc_er_nr_discrimination_line_kwargs_dict)
-        discrimination_line_dict_dict.update({ detector_name +"__" +parameter_name +"__" +str(parameter_val).replace(".","_") : discrimination_line_dict })
+        discrimination_line_dict_dict.update({ detector_name +"__" +parameter_name +"__" +str(parameter_value).replace(".","_") : discrimination_line_dict })
 
+    # finishing
+    end_time = time.time()
+    elapsed_time_s = end_time -start_time
+    td = timedelta(seconds=elapsed_time_s)
+    if flag_verbose : print(f"{fn}: processed {len(parameter_value_list)} discrimination lines within {td} h")
     return discrimination_line_dict_dict
 
 
