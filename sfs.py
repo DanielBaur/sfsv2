@@ -2547,7 +2547,7 @@ plt.legend()
 """
 
 
-def er_nr_discrimination_line_loop(
+def er_nr_discrimination_line_scan(
         baseline_detector_dict,
         parameter_name,
         parameter_value_list,
@@ -2567,7 +2567,7 @@ def er_nr_discrimination_line_loop(
 
     # initialization
     fn = "er_nr_discrimination_line_loop"
-    discrimination_line_dict_dict = {}
+    discrimination_line_scan_dict = {}
     if flag_verbose : print(f"\n{fn}: initializing")
     start_time = time.time()
 
@@ -2586,7 +2586,7 @@ def er_nr_discrimination_line_loop(
             spectrum_dict = er_spectrum_dict,
             baseline_detector_dict = baseline_detector_dict,
             detector_dict = current_detector_dict,
-            detector_name = detector_name,
+            detector_name = detector_name +"__" +parameter_name +"__" +str(parameter_value).replace(".","_"),
             abspath_list_detector_dict_json_output = [],
             flag_verbose = flag_verbose,
             flag_print_stdout_and_stderr = False,)
@@ -2594,7 +2594,7 @@ def er_nr_discrimination_line_loop(
             spectrum_dict = nr_spectrum_dict,
             baseline_detector_dict = baseline_detector_dict,
             detector_dict = {},
-            detector_name = detector_name,
+            detector_name = detector_name +"__" +parameter_name +"__" +str(parameter_value).replace(".","_"),
             abspath_list_detector_dict_json_output = [],
             flag_verbose = flag_verbose,
             flag_print_stdout_and_stderr = False,)
@@ -2607,14 +2607,14 @@ def er_nr_discrimination_line_loop(
             detector_dict = current_detector_dict,
             verbose = flag_verbose,
             **calc_er_nr_discrimination_line_kwargs_dict)
-        discrimination_line_dict_dict.update({ detector_name +"__" +parameter_name +"__" +str(parameter_value).replace(".","_") : discrimination_line_dict })
+        discrimination_line_scan_dict.update({ detector_name +"__" +parameter_name +"__" +str(parameter_value).replace(".","_") : discrimination_line_dict })
 
     # finishing
     end_time = time.time()
     elapsed_time_s = end_time -start_time
     td = timedelta(seconds=elapsed_time_s)
-    if flag_verbose : print(f"{fn}: processed {len(parameter_value_list)} discrimination lines within {td} h")
-    return discrimination_line_dict_dict
+    if flag_verbose : 
+    return discrimination_line_scan_dict
 
 
 
