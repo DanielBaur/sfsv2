@@ -17,6 +17,7 @@ import math
 import matplotlib.pyplot as plt
 import wimprates
 import os
+from random import randrange
 
 
 
@@ -205,6 +206,110 @@ def compute_g2_from_detector_configuration(
     # computing 'g2'
     g2 = ExtEff*SE
     return g2
+
+
+def compute_drift_velocity_from_detector_configuration(
+    detector_dict, # dict, detector configuration
+    drift_field_v_cm, # float, drift velocity in V/cm
+):
+
+    """
+    This function is used to compute the drift velocity of a specific detector configuration in mm/usec.
+    The code below is based on the NESTv2.3.9 computation of according to the function 'NESTcalc::GetDriftVelocity_Liquid' (lines 2258 to 2408).
+    """
+
+    # initialization
+    fn = "compute_drift_velocity_from_detector_configuration"
+    Kelvin = detector_dict["T_Kelvin"] # extracting LXe temperatire in K
+    eField = drift_field_v_cm # extracting drift field in V/cm
+    assert (Kelvin >= 100 and Kelvin <= 230), f"{fn}: temperature out of range"
+
+    speed = 0.0
+
+    polyExp = [
+        [-3.1046, 27.037, -2.1668, 193.27, -4.8024, 646.04, 9.2471], # 100K
+        [-2.7394, 22.760, -1.7775, 222.72, -5.0836, 724.98, 8.7189], # 120K
+        [-2.3646, 164.91, -1.6984, 21.473, -4.4752, 1202.2, 7.9744], # 140K
+        [-1.8097, 235.65, -1.7621, 36.855, -3.5925, 1356.2, 6.7865], # 155K
+        [-1.5000, 37.021, -1.1430, 6.4590, -4.0337, 855.43, 5.4238], # 157K
+        [-1.4939, 47.879, 0.12608, 8.9095, -1.3480, 1310.9, 2.7598], # 163K
+        [-1.5389, 26.602, -.44589, 196.08, -1.1516, 1810.8, 2.8912], # 165K
+        [-1.5000, 28.510, -.21948, 183.49, -1.4320, 1652.9, 2.884], # 167K
+        [-1.1781, 49.072, -1.3008, 3438.4, -.14817, 312.12, 2.8049], # 184K
+        [1.2466, 85.975, -.88005, 918.57, -3.0085, 27.568, 2.3823], # 200K
+        [334.60, 37.556, 0.92211, 345.27, -338.00, 37.346, 1.9834],] # 230K
+
+    Temperatures = [100., 120., 140., 155., 157., 163., 165., 167., 184., 200., 230.]
+
+
+    if (Kelvin >= Temperatures[0] and Kelvin < Temperatures[1]):
+        i = 0
+    elif (Kelvin >= Temperatures[1] and Kelvin < Temperatures[2]):
+        i = 1
+    elif (Kelvin >= Temperatures[2] and Kelvin < Temperatures[3]):
+        i = 2
+    elif (Kelvin >= Temperatures[3] and Kelvin < Temperatures[4]):
+        i = 3
+    elif (Kelvin >= Temperatures[4] and Kelvin < Temperatures[5]):
+        i = 4
+    elif (Kelvin >= Temperatures[5] and Kelvin < Temperatures[6]):
+        i = 5
+    elif (Kelvin >= Temperatures[6] and Kelvin < Temperatures[7]):
+        i = 6
+    elif (Kelvin >= Temperatures[7] and Kelvin < Temperatures[8]):
+        i = 7
+    elif (Kelvin >= Temperatures[8] and Kelvin < Temperatures[9]):
+        i = 8
+    elif (Kelvin >= Temperatures[9] and Kelvin <= Temperatures[10]):
+        i = 9
+
+    j = i + 1;
+
+    Ti = Temperatures[i]
+    Tf = Temperatures[j]
+
+    vi = polyExp[i][0] * np.exp(-eField / polyExp[i][1]) +polyExp[i][2] * np.exp(-eField / polyExp[i][3]) +polyExp[i][4] * np.exp(-eField / polyExp[i][5]) + polyExp[i][6]
+    vf = polyExp[j][0] * np.exp(-eField / polyExp[j][1]) +polyExp[j][2] * np.exp(-eField / polyExp[j][3]) +polyExp[j][4] * np.exp(-eField / polyExp[j][5]) + polyExp[j][6]
+
+    if math.isclose(Kelvin, Ti, rel_tol=1e-7):
+        return vi
+    if math.isclose(Kelvin, Tf, rel_tol=1e-7):
+        return vf
+
+    if (vf < vi):
+        offset = (np.sqrt((Tf * (vf - vi) - Ti * (vf - vi) - 4.) * (vf - vi)) +np.sqrt(Tf - Ti) * (vf + vi)) /(2. * np.sqrt(Tf - Ti))
+        slope = -(np.sqrt(Tf - Ti) *np.sqrt((Tf * (vf - vi) - Ti * (vf - vi) - 4.) * (vf - vi)) -(Tf + Ti) * (vf - vi)) /(2. * (vf - vi))
+        speed = 1. / (Kelvin - slope) + offset
+    else:
+        slope = (vf - vi) / (Tf - Ti);
+        speed = slope * (Kelvin - Ti) + vi;
+
+    if speed <= 0.:
+        speed = 0.1
+        raise Exception(f"drift velocity of {speed} mm/usec is less than zero")
+
+    return speed
+
+
+def adjust_detector_drift_time_parameters(
+    detector_dict,
+    drift_field_v_cm):
+
+    """
+    This function is used to adjust the "dtCntr", "dt_min", and "dt_max" parameters in a 'detector_dict' for the respective drift field.
+    """
+
+    new_detector_dict = detector_dict.copy()
+    drift_velocity_mm_usec = compute_drift_velocity_from_detector_configuration(detector_dict,drift_field_v_cm)
+    max_drift_time_usec = (detector_dict['TopDrift']-detector_dict['cathode'])/drift_velocity_mm_usec
+    dt_min = 0.1*max_drift_time_usec
+    dt_max = 0.9*max_drift_time_usec
+    dtCntr = 0.5*max_drift_time_usec
+    new_detector_dict.update({
+        "dtCntr" : float(f"{dtCntr:.1f}"),
+        "dt_max" : float(f"{dt_max:.1f}"),
+        "dt_min" : float(f"{dt_min:.1f}"),})
+    return new_detector_dict
 
 
 
@@ -450,7 +555,7 @@ def give_spectrum(
             "E_min[keV]" : energy_bins,
             "E_max[keV]" : energy_bins,
             "field_drift[V/cm]" : field_drift,
-            "x,y,z-position[mm]" : "-1 -1 -1",
+            "x,y,z-position[mm]" : "-1",
             "seed" : 0
         }
 
@@ -1022,7 +1127,7 @@ def give_flat_spectrum(
             "E_min[keV]" : energy_bins,
             "E_max[keV]" : energy_bins,
             "field_drift[V/cm]" : field_drift,
-            "x,y,z-position[mm]" : "-1 -1 -1",
+            "x,y,z-position[mm]" : "-1",
             "seed" : 0
         }
 
@@ -1313,9 +1418,9 @@ def give_spectrum_dict(
     exposure_t_y = 40*5,
     num_events = -1,
     # nest parameters
-    seed = 0,
+    seed = 0, # integer between 0 and 10000000, or "randomint" to generate a random integer between 0 and 10000000
     drift_field_v_cm = 200,
-    xyz_pos_mm = "-1 -1 -1",
+    xyz_pos_mm = "-1",
     # flags
     flag_spectrum_type = ["differential", "integral"][0],
     flag_verbose = False,
@@ -1909,7 +2014,7 @@ def execNEST(
         if "seed" in [*spectrum_dict]:
             if spectrum_dict["seed"] != 0:
                 seed = spectrum_dict["seed"]
-        default_xyz = "-1 -1 -1"
+        default_xyz = "-1"
         xyz = default_xyz
         if "x,y,z-position[mm]" in [*spectrum_dict]:
             if spectrum_dict["x,y,z-position[mm]"] not in [0, "", default_xyz]:
@@ -2188,7 +2293,6 @@ def gen_signature_plot(
     # plot discrimination line
     dl_x_data = plot_discrimination_line_dict["dl_x_data_s1_over_g1"] if plot_axes_units=="cs2_over_cs1_vs_cs1_over_g1" else plot_discrimination_line_dict["dl_x_data_s1"]
     dl_y_data = plot_discrimination_line_dict["dl_y_data_s2_over_s1"] if plot_axes_units=="cs2_over_cs1_vs_cs1_over_g1" else plot_discrimination_line_dict["dl_y_data_s2"]
-    print(plot_discrimination_line_dict["er_rejection"])
     ax1.plot(
         dl_x_data,
         dl_y_data,
@@ -2439,6 +2543,73 @@ plt.legend()
 
 
 """
+
+
+def er_nr_discrimination_line_loop(
+        baseline_detector_dict,
+        parameter_name,
+        parameter_value_list,
+        detector_name,
+        er_spectrum_dict,
+        nr_spectrum_dict,
+        calc_er_nr_discrimination_line_kwargs_dict, # dictionary with keyword parameters passed on to 'calc_er_nr_discrimination_line'
+        flag_abspath_list_discrimination_lines_output = [],
+        flag_verbose = [False, True][0],
+    ):
+
+    """
+    This function is used to automatically compute the ER/NR discrimination for a list of parameter values.
+    NOTE: so far a drift field sweep is not possible.
+    returns:    'discrimination_line_dict_dict' is a dictionary with 
+    """
+
+    # initialization
+    fn = "er_nr_discrimination_line_loop"
+    discrimination_line_dict_dict = {}
+    if flag_verbose : print(f"\n{fn}: initializing")
+
+    # looping over the specified parameter space
+    if flag_verbose : print(f"\n{fn}: looping over parameter space")
+    for k, parameter_value in enumerate(parameter_value_list):
+        if flag_verbose : print(f"\n{fn}: 'parameter_name' = '{parameter_name}', 'parameter_value'='{parameter_value}'")
+
+        # adapting the detector
+        current_detector_dict = baseline_detector_dict.copy()
+        current_detector_dict.update({parameter_name : parameter_value})
+
+        # executing 'execNEST'
+        if flag_verbose : print(f"\n{fn}: executing 'execNEST'")
+        er_spectrum_ndarray = execNEST(
+            spectrum_dict = er_spectrum_dict,
+            baseline_detector_dict = baseline_detector_dict,
+            detector_dict = current_detector_dict,
+            detector_name = detector_name,
+            abspath_list_detector_dict_json_output = [],
+            flag_verbose = flag_verbose,
+            flag_print_stdout_and_stderr = False,)
+        nr_spectrum_ndarray = execNEST(
+            spectrum_dict = nr_spectrum_dict,
+            baseline_detector_dict = baseline_detector_dict,
+            detector_dict = {},
+            detector_name = detector_name,
+            abspath_list_detector_dict_json_output = [],
+            flag_verbose = flag_verbose,
+            flag_print_stdout_and_stderr = False,)
+
+        # computing the 'discrimination_line_dict'
+        if flag_verbose : print(f"\n{fn}: computing 'discrimination_line_dict'")
+        discrimination_line_dict = calc_er_nr_discrimination_line(
+            er_spectrum = er_spectrum_ndarray,
+            nr_spectrum = nr_spectrum_ndarray,
+            detector_dict = current_detector_dict,
+            verbose = flag_verbose,
+            **calc_er_nr_discrimination_line_kwargs_dict)
+        discrimination_line_dict_dict.update({ detector_name +"__" +parameter_name +"__" +str(parameter_val).replace(".","_") : discrimination_line_dict })
+
+    return discrimination_line_dict_dict
+
+
+
 
 
 ############################################
