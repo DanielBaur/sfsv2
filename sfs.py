@@ -14,6 +14,7 @@ import scipy.integrate as integrate
 import scipy.constants as constants
 from scipy.integrate import quad
 import math
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import wimprates
 import os
@@ -81,6 +82,15 @@ exemplary_darwin_baseline_detector_dict = {
     # 2D (xy) position reconstruction
     "PosResExp"         : 0.015,                    # exp increase in pos recon res at hi r, units: 1/mm,                                   JN: 0.015, LUX_Run03: 0.015 (arXiv:1710.02752 indirectly), XENON10: 0.015
     "PosResBase"        : 30.,                      # baseline unc in mm, see NEST.cpp for usage,                                           JN: 30.0, LUX_Run03: 70.8364 ((1710.02752 indirectly), XEONON10: 70.8364
+}
+
+
+translate_parameter_to_latex_dict = { # latex symbol, written quantity, latex unit
+    "g1"             : [r"$g_1$",                   r"g1 parameter",                   r"$\mathrm{\frac{phd}{photon}}$"],
+    "g1_gas"         : [r"$g_1^{\mathrm{gas}}$",    r"jfk",                            r"$\mathrm{\frac{phd}{photon}}$"],
+    "E_gas"          : [r"$E_{\mathrm{gas}}$",      r"amplification field strength",   r"$\frac{\mathrm{V}}{\mathrm{cm}}$"],
+    "eLife_us"       : [r"$\tau_{e^{-}}$",          r"electron life-time",             r"$\mathrm{\upmu s}$"],
+    "e_drift_v_cm"   : [r"$E_{\mathrm{drift}}$",    r"drift field strength",           r"$\frac{\mathrm{V}}{\mathrm{cm}}$"],
 }
 
 
@@ -1945,8 +1955,9 @@ def install_detector_header_file(
 
 def execNEST(
     spectrum_dict, # dict, dictionary resembling the input spectrum to be simulated by NEST
+    baseline_drift_field_v_cm, # float, baseline electrical drift field, this needs to be given since parameters of the NEST detector header file (.hh) depend on the drift field (e.g., 'dtCntr')
     baseline_detector_dict, # dict, 'detector_dict' of the DARWIN baseline detector
-    detector_dict = {}, # dict or abspath-string, dictionary or .json-file resembling the detector the spectrum is supposed to be simulated in
+    detector_dict = {}, # dict, resembling the detector to be installed, no new detector is installed if empty
     detector_name = "", # string, name of the detector, only required when not referring to an existing file
     abspath_list_detector_dict_json_output = [], # list of strings, list of abspaths into which the detector_dict.json files are saved
     abspathfile_execNEST_binary = abspathfile_nest_installation_execNEST_bin, # string, abspathfile of the 'execNEST' executiable generated in the 'install' NEST folder
@@ -1970,29 +1981,30 @@ def execNEST(
     debug_list = []
 
     ### detector adaptation
-    if detector_dict == {}:
+    if detector_dict == {} and float(baseline_drift_field_v_cm)==float(spectrum_dict["field_drift[V/cm]"]):
         if flag_verbose: print(f"{fn}: no detector specified --> running with the pre-installed detector")
         pass
     else:
-        if type(detector_dict)==str:
-            if detector_dict.endswith(".hh"):
-                detector_name = list(detector_dict[:-3].split("/"))[-1]
-                if flag_verbose: print(f"{fn}: specified detector '{detector_name}' as .hh-file: {detector_dict}")
-                new_detector_hh_abspathfile = detector_dict
-            elif detector_dict.endswith(".json"):
-                detector_name = list(detector_dict[:-5].split("/"))[-1]
-                if flag_verbose: print(f"{fn}: specified detector '{detector_name}' as .json-file: {detector_dict}")
-                if flag_verbose: print(f"{fn}: updating baseline detector: {abspathfile_baseline_detector_json}")
-                new_detector_dict = baseline_detector_dict.copy()
-                new_detector_dict.update(get_dict_from_json(detector_dict))
-                convert_detector_dict_into_detector_header()
-        elif type(detector_dict)==dict:
+#        if type(detector_dict)==str:
+#            if detector_dict.endswith(".hh"):
+#                detector_name = list(detector_dict[:-3].split("/"))[-1]
+#                if flag_verbose: print(f"{fn}: specified detector '{detector_name}' as .hh-file: {detector_dict}")
+#                new_detector_hh_abspathfile = detector_dict
+#            elif detector_dict.endswith(".json"):
+#                detector_name = list(detector_dict[:-5].split("/"))[-1]
+#                if flag_verbose: print(f"{fn}: specified detector '{detector_name}' as .json-file: {detector_dict}")
+#                if flag_verbose: print(f"{fn}: updating baseline detector: {abspathfile_baseline_detector_json}")
+#                new_detector_dict = baseline_detector_dict.copy()
+#                new_detector_dict.update(get_dict_from_json(detector_dict))
+#                convert_detector_dict_into_detector_header()
+        if type(detector_dict)==dict:
             if detector_name=="" : raise Exception(f"ERROR: You did not specify a detector name!")
             if flag_verbose: print(f"{fn}: specified detector '{detector_name}'as dictionary: {detector_dict}")
             if flag_verbose: print(f"{fn}: updating baseline detector")
             new_detector_dict = baseline_detector_dict.copy()
             new_detector_dict.update(detector_dict)
-            print(new_detector_dict)
+            new_detector_dict = adjust_detector_drift_time_parameters(detector_dict=new_detector_dict, drift_field_v_cm=spectrum_dict["field_drift[V/cm]"])
+            #print(new_detector_dict)
             convert_detector_dict_into_detector_header(
                 detector_dict = new_detector_dict,
                 abspath_output_list = abspath_list_detector_dict_json_output +[abspath_nest_installation_nest_include_detectors],
@@ -2457,6 +2469,7 @@ def calc_er_nr_discrimination_line(
         "dl_y_data_s2": list(dl_S2_data),
         "nr_acceptance": float(nr_acceptance),
         "er_rejection": float(er_rejection),
+        "er_rejection_uncertainty": np.sqrt(2)*(np.sqrt(total_er)/total_er), # with Poissontian uncertainties approximated as np.sqrt, since statistics sufficiently high
 #        "nr_below_dl": list(nr_below_dl),
     }
 
@@ -2549,6 +2562,7 @@ plt.legend()
 
 def er_nr_discrimination_line_scan(
         baseline_detector_dict,
+        baseline_drift_field_v_cm,
         parameter_name,
         parameter_value_list,
         detector_name,
@@ -2578,20 +2592,30 @@ def er_nr_discrimination_line_scan(
 
         # adapting the detector
         current_detector_dict = baseline_detector_dict.copy()
-        current_detector_dict.update({parameter_name : parameter_value})
+        if parameter_name != "e_drift_v_cm":
+            current_detector_dict.update({parameter_name : parameter_value})
+            current_er_spectrum_dict = er_spectrum_dict
+            current_nr_spectrum_dict = nr_spectrum_dict
+        else:
+            current_er_spectrum_dict = er_spectrum_dict
+            current_er_spectrum_dict["field_drift[V/cm]"] = parameter_value
+            current_nr_spectrum_dict = nr_spectrum_dict
+            current_nr_spectrum_dict["field_drift[V/cm]"] = parameter_value
 
         # executing 'execNEST'
         if flag_verbose : print(f"{fn}: executing 'execNEST'")
         er_spectrum_ndarray = execNEST(
-            spectrum_dict = er_spectrum_dict,
+            spectrum_dict = current_er_spectrum_dict,
             baseline_detector_dict = baseline_detector_dict,
+            baseline_drift_field_v_cm = baseline_drift_field_v_cm,
             detector_dict = current_detector_dict,
             detector_name = detector_name +"__" +parameter_name +"__" +str(parameter_value).replace(".","_"),
             abspath_list_detector_dict_json_output = [],
             flag_verbose = flag_verbose,
             flag_print_stdout_and_stderr = False,)
         nr_spectrum_ndarray = execNEST(
-            spectrum_dict = nr_spectrum_dict,
+            spectrum_dict = current_nr_spectrum_dict,
+            baseline_drift_field_v_cm = baseline_drift_field_v_cm,
             baseline_detector_dict = baseline_detector_dict,
             detector_dict = {},
             detector_name = detector_name +"__" +parameter_name +"__" +str(parameter_value).replace(".","_"),
@@ -2613,8 +2637,156 @@ def er_nr_discrimination_line_scan(
     end_time = time.time()
     elapsed_time_s = end_time -start_time
     td = timedelta(seconds=elapsed_time_s)
-    if flag_verbose : 
+    if flag_verbose : print(f"{fn}: processed {len(parameter_value_list)} discrimination lines within {td} h")
     return discrimination_line_scan_dict
+
+
+def gen_discrimination_line_scan_plot(
+    # required input
+    discrimination_line_scan_dict, # dict, as generated with 'er_nr_discrimination_line_scan()' or multiplie summarized instances thereof
+    primary_parameter_name, # string, an individual discrimination line scan is plotted for each value of this parameter
+    secondary_parameter_name, # string, this parameter defines the x-axis of the plot
+    # predefined input
+    output_abspathstring_list = [], # list, list of abspathstrings according to which the generated plot is saved
+    parameter_translation_dict = translate_parameter_to_latex_dict,
+    # plot style parameters
+    plot_fontsize_axis_label = 11,
+    plot_figure_size_x_inch = 5.670,
+    plot_aspect_ratio = 9/16,
+    plot_log_y_axis = False,
+    plot_log_x_axis = False,
+    plot_xlim = [],
+    plot_ylim = [],
+    plot_legend = True,
+    plot_legend_bbox_to_anchor = [0.45, 0.63, 0.25, 0.25],
+    plot_legend_labelspacing = 0.5,
+    plot_legend_fontsize = 9,
+    plot_legend_invert_order = [False,True][0],
+    plot_text_dict_list = [],
+    plot_scatter_format_dict = {},
+    plot_cmap = ["viridis", "plasma", "gist_rainbow", "brg", "YlGnBu"][0],
+    # flags
+    flag_verbose = [False,True][0],):
+
+    """
+    This function is used to plot the various ER rejections inferred with 'er_nr_discrimination_line_scan()'.
+    """
+
+    # initializing
+    fn = "gen_discrimination_line_scan_plot"
+    if flag_verbose : print(f"\n{fn}: initializing")
+    primary_parameter_latex_string = primary_parameter_name.replace("_", "\_")
+    secondary_parameter_latex_string = secondary_parameter_name.replace("_", "\_")
+
+    # parameter value retrieval
+    primary_parameter_values = []
+    secondary_parameter_values = []
+    detector_list = []
+    nr_acceptance_list = []
+    for detector_name in [*discrimination_line_scan_dict]:
+        detector_name_list = list(detector_name.split("__"))
+        detector_list.append(detector_name_list[0])
+        nr_acceptance_list.append(discrimination_line_scan_dict[detector_name]["nr_acceptance"])
+        primary_parameter_index = detector_name_list.index(primary_parameter_name)
+        secondary_parameter_index = detector_name_list.index(secondary_parameter_name)
+        primary_parameter_value = detector_name_list[primary_parameter_index+1]
+        secondary_parameter_value = detector_name_list[secondary_parameter_index+1]
+        primary_parameter_values.append(primary_parameter_value)
+        secondary_parameter_values.append(secondary_parameter_value)
+    detector_list = list(set(detector_list))
+    assert len(detector_list)==1, f"ERROR multiple detector names found in 'discrimination_line_scan_dict': {detector_list}"
+    nr_acceptance_list = list(set(nr_acceptance_list))
+    assert len(nr_acceptance_list)==1, f"ERROR multiple NR acceptances found in 'discrimination_line_scan_dict': {nr_acceptance_list}"
+    detector_name = detector_list[0]
+    nr_acceptance = nr_acceptance_list[0]
+    primary_parameter_values_strings = sorted(list(set(primary_parameter_values)))
+    secondary_parameter_values_strings = sorted(list(set(secondary_parameter_values)))
+    primary_parameter_values_floats = [float(valstring.replace("_", ".")) for valstring in primary_parameter_values_strings]
+    secondary_parameter_values_floats = [float(valstring.replace("_", ".")) for valstring in secondary_parameter_values_strings]
+
+    # canvas
+    if flag_verbose: print(f"{fn}: setting up canvas")
+    fig = plt.figure(
+        figsize = [plot_figure_size_x_inch, plot_figure_size_x_inch*plot_aspect_ratio],
+        dpi = 150,
+        constrained_layout = True) 
+
+    # axes
+    if flag_verbose: print(f"{fn}: setting up axes")
+    ax1 = fig.add_subplot()
+    ax1.set_xlabel(parameter_translation_dict[secondary_parameter_name][1] +", " +parameter_translation_dict[secondary_parameter_name][0] +" / " +parameter_translation_dict[secondary_parameter_name][2], fontsize=plot_fontsize_axis_label)
+    ax1.set_ylabel(r"ER rejection at $" +f"{100*nr_acceptance:.0f}" +r"\,\%$ NR acceptance / $\%$", fontsize=plot_fontsize_axis_label)
+    if plot_xlim != []: ax1.set_xlim(plot_xlim)
+    if plot_ylim != []: ax1.set_ylim(plot_ylim)
+    if plot_log_y_axis: ax1.set_yscale('log')
+    if plot_log_x_axis: ax1.set_xscale('log')
+
+    # plotting
+    for k, (primary_parameter_value_string, primary_parameter_value_float) in enumerate(zip(primary_parameter_values_strings, primary_parameter_values_floats)):
+        # scatter plot color
+        cmap = mpl.cm.get_cmap(plot_cmap)
+        color_float_index = list(np.linspace(start=0, stop=1, num=len(primary_parameter_values_strings), endpoint=False))[k]
+        color = mpl.colors.to_hex(cmap(color_float_index), keep_alpha=True)
+        # scatter plot format
+        default_scatter_format_dict = {
+            "alpha" : 1,
+            "zorder" : 1,
+            "marker" : "o", # markerstyle, see: https://matplotlib.org/stable/api/markers_api.html#module-matplotlib.markers
+            "linewidths" : 0.0,
+            "s" : 4,
+            "edgecolors" : "black",
+            "facecolors" : color,
+            "linestyles" : "-",}
+        format_dict = default_scatter_format_dict.copy()
+        format_dict.update(plot_scatter_format_dict)
+        # scatter plotting
+        ax1.scatter(
+            secondary_parameter_values_floats,
+            [discrimination_line_scan_dict[detector_name +"__" +primary_parameter_name +"__" +primary_parameter_value_string +"__" +secondary_parameter_name +"__" +secondary_parameter_value_string]["er_rejection"]*100 for secondary_parameter_value_string in secondary_parameter_values_strings],
+            label = parameter_translation_dict[primary_parameter_name][0] +r"$=" +f"{primary_parameter_value_float}" +r"\,$" +parameter_translation_dict[primary_parameter_name][2],
+            **format_dict,)
+
+    # legend
+    handles, labels = ax1.get_legend_handles_labels()
+    if plot_legend_invert_order:
+        handles = handles[::-1]
+        labels = labels[::-1]
+    if plot_legend : ax1.legend(
+        handles,
+        labels,
+        loc = "center",
+        labelspacing = plot_legend_labelspacing,
+        fontsize = plot_legend_fontsize,
+        bbox_to_anchor = plot_legend_bbox_to_anchor,
+        bbox_transform = ax1.transAxes,)
+
+    # finishing
+    if flag_verbose : print(f"{fn}: finishing")
+    plt.show()
+    for abspathstring in output_abspathstring_list:
+        fig.savefig(abspathstring)
+    if flag_verbose : print(f"{fn}: finished")
+    return
+
+
+#        plt.errorbar(
+#            marker = "o", # plotting just the errorbars
+#            markersize = 3.8,
+#            markerfacecolor = "white",
+#            markeredgewidth = 0.5,
+#            markeredgecolor = isotope_dict[isotope]["color"],
+#            linestyle = "",
+#            fmt = '',
+#            x = [ts*time_unit_conversion_factor for ts in amf_data["interval_center_s"]],
+#            y = amf_data["decays_per_interval"],
+#            yerr = amf_data["decays_per_interval_loweruncertainty"],
+##            xerr = [0.5*measurement_data_dict["activity_data_input"]["activity_interval_ps"]*(1/10**12)*time_unit_conversion_factor for ts in measurement_data_dict["activity_data_output"]["activity_model_fit_results"][isotope]["timestamp_centers_seconds"]],
+#            ecolor = isotope_dict[isotope]["color"],
+#            elinewidth = 0.5,
+#            capsize = 1.2,
+#            barsabove = True,
+#            label = isotope_dict[isotope]["latex_label"] +" (data)",
+#            capthick = 0.5)
 
 
 
