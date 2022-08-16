@@ -2663,7 +2663,8 @@ def gen_discrimination_line_scan_plot(
     plot_legend_fontsize = 9,
     plot_legend_invert_order = [False,True][0],
     plot_text_dict_list = [],
-    plot_scatter_format_dict = {},
+    plot_marker_linewidth = 0.9,
+    plot_marker_size = 5,
     plot_cmap = ["viridis", "plasma", "gist_rainbow", "brg", "YlGnBu"][0],
     # flags
     flag_verbose = [False,True][0],):
@@ -2729,22 +2730,45 @@ def gen_discrimination_line_scan_plot(
         color = mpl.colors.to_hex(cmap(color_float_index), keep_alpha=True)
         # scatter plot format
         default_scatter_format_dict = {
-            "alpha" : 1,
-            "zorder" : 1,
-            "marker" : "o", # markerstyle, see: https://matplotlib.org/stable/api/markers_api.html#module-matplotlib.markers
-            "linewidths" : 0.0,
-            "s" : 4,
-            "edgecolors" : "black",
-            "facecolors" : color,
-            "linestyles" : "-",}
-        format_dict = default_scatter_format_dict.copy()
-        format_dict.update(plot_scatter_format_dict)
+            "alpha"           : 1,
+            "zorder"          : 1,
+            "marker"          : "o", # markerstyle, see: https://matplotlib.org/stable/api/markers_api.html#module-matplotlib.markers
+            "linewidths"      : plot_marker_linewidth,
+            "s"               : plot_marker_size**2, # due to weird size scaling this needs to be squared to match the errorbar function
+            "edgecolors"      : color,
+            "facecolors"      : "white",
+            "linestyles"      : "-",}
+        default_errorbar_format_dict = {
+            "alpha"           : 1,
+            "zorder"          : 1,
+            "marker"          : "o",
+            "markersize"      : plot_marker_size,
+            "markerfacecolor" : "white",
+            "markeredgewidth" : plot_marker_linewidth,
+            "markeredgecolor" : color,
+            "linestyle"       : "",
+            "fmt"             : '',
+            "ecolor"          : color,
+            "elinewidth"      : plot_marker_linewidth,
+            "capsize"         : 1.8,
+            "barsabove"       : True,
+            "capthick"        : plot_marker_linewidth,}
+        scatter_format_dict = default_scatter_format_dict.copy()
+        #scatter_format_dict.update(plot_scatter_format_dict)
+        errorbar_format_dict = default_errorbar_format_dict.copy()
+        #errorbar_format_dict.update(plot_errorbar_format_dict)
         # scatter plotting
+        ax1.errorbar(
+            x = secondary_parameter_values_floats,
+            y = [discrimination_line_scan_dict[detector_name +"__" +primary_parameter_name +"__" +primary_parameter_value_string +"__" +secondary_parameter_name +"__" +secondary_parameter_value_string]["er_rejection"]*100 for secondary_parameter_value_string in secondary_parameter_values_strings],
+            yerr = [discrimination_line_scan_dict[detector_name +"__" +primary_parameter_name +"__" +primary_parameter_value_string +"__" +secondary_parameter_name +"__" +secondary_parameter_value_string]["er_rejection_uncertainty"]*100 for secondary_parameter_value_string in secondary_parameter_values_strings],
+            label = parameter_translation_dict[primary_parameter_name][0] +r"$=" +f"{primary_parameter_value_float}" +r"\,$" +parameter_translation_dict[primary_parameter_name][2],
+            **errorbar_format_dict,)
         ax1.scatter(
             secondary_parameter_values_floats,
             [discrimination_line_scan_dict[detector_name +"__" +primary_parameter_name +"__" +primary_parameter_value_string +"__" +secondary_parameter_name +"__" +secondary_parameter_value_string]["er_rejection"]*100 for secondary_parameter_value_string in secondary_parameter_values_strings],
-            label = parameter_translation_dict[primary_parameter_name][0] +r"$=" +f"{primary_parameter_value_float}" +r"\,$" +parameter_translation_dict[primary_parameter_name][2],
-            **format_dict,)
+            #label = parameter_translation_dict[primary_parameter_name][0] +r"$=" +f"{primary_parameter_value_float}" +r"\,$" +parameter_translation_dict[primary_parameter_name][2],
+            **scatter_format_dict,)
 
     # legend
     handles, labels = ax1.get_legend_handles_labels()
@@ -2767,26 +2791,6 @@ def gen_discrimination_line_scan_plot(
         fig.savefig(abspathstring)
     if flag_verbose : print(f"{fn}: finished")
     return
-
-
-#        plt.errorbar(
-#            marker = "o", # plotting just the errorbars
-#            markersize = 3.8,
-#            markerfacecolor = "white",
-#            markeredgewidth = 0.5,
-#            markeredgecolor = isotope_dict[isotope]["color"],
-#            linestyle = "",
-#            fmt = '',
-#            x = [ts*time_unit_conversion_factor for ts in amf_data["interval_center_s"]],
-#            y = amf_data["decays_per_interval"],
-#            yerr = amf_data["decays_per_interval_loweruncertainty"],
-##            xerr = [0.5*measurement_data_dict["activity_data_input"]["activity_interval_ps"]*(1/10**12)*time_unit_conversion_factor for ts in measurement_data_dict["activity_data_output"]["activity_model_fit_results"][isotope]["timestamp_centers_seconds"]],
-#            ecolor = isotope_dict[isotope]["color"],
-#            elinewidth = 0.5,
-#            capsize = 1.2,
-#            barsabove = True,
-#            label = isotope_dict[isotope]["latex_label"] +" (data)",
-#            capthick = 0.5)
 
 
 
