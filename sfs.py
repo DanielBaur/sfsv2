@@ -2821,7 +2821,7 @@ def gen_discrimination_line_scan_plot(
 def reduce_nest_signature_to_eroi(
     sim_ndarray, # ndarry, outpur from execNEST
     eroi, # array containing start and end of the energy region of interest in keV
-    detector_dict = darwin_baseline_detector_dict):
+    detector_dict):
 
     """
     This function is used to select the signature data that lies within the WIMP EROI.
@@ -2833,8 +2833,8 @@ def reduce_nest_signature_to_eroi(
     w = 13.6 # eV
 
     sim_ndarray = sim_ndarray[
-        ( wimp_eroi_kev_ee[0] < w/1000*(sim_ndarray["S1_3Dcor [phd]"]/g1 + sim_ndarray["S2_3Dcorr [phd]"]/g2) ) &
-        ( w/1000 *(sim_ndarray["S1_3Dcor [phd]"] /g1 + sim_ndarray["S2_3Dcorr [phd]"] /g2) < wimp_eroi_kev_ee[1] ) &
+        ( eroi[0] < w/1000*(sim_ndarray["S1_3Dcor [phd]"]/g1 + sim_ndarray["S2_3Dcorr [phd]"]/g2) ) &
+        ( w/1000 *(sim_ndarray["S1_3Dcor [phd]"] /g1 + sim_ndarray["S2_3Dcorr [phd]"] /g2) < eroi[1] ) &
         ( sim_ndarray["S1_3Dcor [phd]"] > 0 ) &
         ( sim_ndarray["S2_3Dcorr [phd]"] > 0 )
     ]
@@ -2862,6 +2862,7 @@ def calculate_wimp_parameter_exclusion_curve_dict(
     simulation__nr_spectrum_energy_simulation_window_kev,           # two-tuple, NR simulation window (due to leakage from lower and higher energies it is not sufficient to just simulate for the WIMP EROI)
     simulation__number_of_spectrum_energy_bins,                     # int, number of energy bins into which the simulated spectra are histogrammed
     simulation__number_of_upper_limit_simulations_per_wimp_mass,    # int, number of upper limits the median upper limit is computed from
+    simulation__number_of_pdf_calculation_events,                   # int, number of events simulated per PDF computation (i.e., one for ER and NR each plus one for each WIMP mass investigated)
     # limit calculation parameters
     limit__er_eroi_kev,                                             # two-tuple, WIMP EROI in keV_ee
     limit__nr_eroi_kev,                                             # two-tuple, WIMP EROI in keV_nr
@@ -2870,6 +2871,7 @@ def calculate_wimp_parameter_exclusion_curve_dict(
     limit__number_of_cs2_bins                                       = 20, # int, number of bins in cS2 based on which the spectrum PDF is computed for the likelihood function
     # flags
     flag_verbose                                                    = [False, True, "high-level-only"][2],                              # flag indicating the output this function is printing onto the screen
+    flag_load_er_and_nr_signatures_for_pdf_calculation              = [False, True][0],                                                 # flag indicating whether or not the ER and NR signature are loaded instead of being computed (mainly relevant for testing)
     flag_plot_pdfs                                                  = [False, True, "er_nr_only"][2],                                   # flag indicating whether or not the inferred pdfs are being plotted
 ):
 
@@ -2883,27 +2885,26 @@ def calculate_wimp_parameter_exclusion_curve_dict(
     flag_verbose_low_level = True if flag_verbose == True else False
     start_time = time.time()
 
+    # implementing the detector
+    if flag_verbose : print(f"{fn}: implementing the detector")
+    #calc_active_xenon_mass_of_detector_dict_t(detector_dict)
+    if flag_verbose : print(f"\tupdating drift velocity-dependent parameters")
+    install_detector_dict = detector__nest_parameter_dict.copy()
+    install_detector_dict = adjust_detector_drift_time_parameters(detector_dict=install_detector_dict, drift_field_v_cm=detector__drift_field_v_cm)
+    if flag_verbose : print(f"\tsaving detector header file")
+    convert_detector_dict_into_detector_header(
+        detector_dict = install_detector_dict,
+        abspath_output_list = [abspath_nest_installation_nest_include_detectors],
+        detector_name = detector__detector_name,
+        flag_verbose = flag_verbose_low_level,)
+    if flag_verbose : print(f"\tinstalling detector header file")
+    install_detector_header_file(
+        abspathfile_new_detector_hh = abspath_nest_installation_nest_include_detectors +detector__detector_name +".hh",
+        flag_clean_reinstall = True,
+        flag_verbose = flag_verbose_low_level)
 
-#    # implementing the detector
-#    if flag_verbose : print(f"{fn}: implementing the detector")
-#    #calc_active_xenon_mass_of_detector_dict_t(detector_dict)
-#    if flag_verbose : print(f"\tupdating drift velocity-dependent parameters")
-#    install_detector_dict = detector__nest_parameter_dict.copy()
-#    install_detector_dict = adjust_detector_drift_time_parameters(detector_dict=install_detector_dict, drift_field_v_cm=detector__drift_field_v_cm)
-#    if flag_verbose : print(f"\tsaving detector header file")
-#    convert_detector_dict_into_detector_header(
-#        detector_dict = install_detector_dict,
-#        abspath_output_list = [abspath_nest_installation_nest_include_detectors],
-#        detector_name = detector__detector_name,
-#        flag_verbose = flag_verbose_low_level,)
-#    if flag_verbose : print(f"\tinstalling detector header file")
-#    install_detector_header_file(
-#        abspathfile_new_detector_hh = abspath_nest_installation_nest_include_detectors +detector__detector_name +".hh",
-#        flag_clean_reinstall = True,
-#        flag_verbose = flag_verbose_low_level)
-
-    # calculating the spectral PDFs
-    if flag_verbose : print(f"{fn}: calculating the spectral PDFs")
+    # calculating the spectral PDFs for ER and NR background
+    if flag_verbose : print(f"{fn}: calculating the spectral PDFs for ER and NR background")
 
     if flag_verbose : print(f"\tdefining 'spectrum_components_dict'")
     spectrum_components_dict = {
@@ -2911,7 +2912,7 @@ def calculate_wimp_parameter_exclusion_curve_dict(
             "simulation_settings" : {
                 "spectral_shape" : spectrum__er_background_model,
                 "recoil_energy_kev_list" : bin_centers_from_interval(simulation__er_spectrum_energy_simulation_window_kev, simulation__number_of_spectrum_energy_bins),
-                "num_events" : 4000000,
+                "num_events" : simulation__number_of_pdf_calculation_events,
                 "differential_rate_parameters" : {},
                 "abspathstring_test_signature" : "/home/daniel/Desktop/arbeitsstuff/sfs/github_repo_v2/signatures/example__signature__darwin_baseline_detector__er_background_high_stat.npy",
             },
@@ -2922,7 +2923,7 @@ def calculate_wimp_parameter_exclusion_curve_dict(
             "simulation_settings" : {
                 "spectral_shape" : spectrum__nr_background_model,
                 "recoil_energy_kev_list" : bin_centers_from_interval(simulation__nr_spectrum_energy_simulation_window_kev, simulation__number_of_spectrum_energy_bins),
-                "num_events" : 4000000,
+                "num_events" : simulation__number_of_pdf_calculation_events,
                 "differential_rate_parameters" : {},
                 "abspathstring_test_signature" : "/home/daniel/Desktop/arbeitsstuff/sfs/github_repo_v2/signatures/example__signature__darwin_baseline_detector__nr_background_high_stat.npy",
             },
@@ -2933,7 +2934,7 @@ def calculate_wimp_parameter_exclusion_curve_dict(
             "simulation_settings" : {
                 "spectral_shape" : spectrum__nr_background_model,
                 "recoil_energy_kev_list" : bin_centers_from_interval(simulation__nr_spectrum_energy_simulation_window_kev, simulation__number_of_spectrum_energy_bins),
-                "num_events" : 4000000,
+                "num_events" : simulation__number_of_pdf_calculation_events,
                 "differential_rate_parameters" : {
                     "mw" : 50, # will be overwritten later on
                     "sigma_nucleon" : 10**(-45), # is irrelevant since spectral shape does not depend on sigma
@@ -2944,9 +2945,7 @@ def calculate_wimp_parameter_exclusion_curve_dict(
         },
     }
 
-    if flag_verbose : print(f"\tlooping over 'er_background' and 'nr_background'")
     for spectrum_string in ["er_background", "nr_background"]:
-
         if flag_verbose : print(f"\tcalculating 'integral_spectrum_dict' for '{spectrum_string}'")
         integral_spectrum_dict = give_spectrum_dict(
             spectrum_name                  = spectrum_components_dict[spectrum_string]["simulation_settings"]["spectral_shape"],
@@ -2966,11 +2965,31 @@ def calculate_wimp_parameter_exclusion_curve_dict(
             differential_rate_parameters   = spectrum_components_dict[spectrum_string]["simulation_settings"]["differential_rate_parameters"],)
         spectrum_components_dict[spectrum_string].update({"integral_spectrum_dict" : integral_spectrum_dict})
 
-    if flag_verbose : print(f"\tgenerating PDF signatures for 'er_background' and 'nr_background' by executing NEST")
-    er_spectrum_signature = np.load(spectrum_components_dict["er_background"]["simulation_settings"]["abspathstring_test_signature"])
-    nr_spectrum_signature = np.load(spectrum_components_dict["nr_background"]["simulation_settings"]["abspathstring_test_signature"])
+    if flag_verbose : print(f"\tgenerating 'er_background' and 'nr_background' signatures for PDF calculation by executing NEST")
+    if flag_load_er_and_nr_signatures_for_pdf_calculation:
+        er_spectrum_signature = np.load(spectrum_components_dict["er_background"]["simulation_settings"]["abspathstring_test_signature"])
+        nr_spectrum_signature = np.load(spectrum_components_dict["nr_background"]["simulation_settings"]["abspathstring_test_signature"])
+    else:
+        er_spectrum_signature = execNEST(
+            spectrum_dict = spectrum_components_dict["er_background"]["integral_spectrum_dict"],
+            baseline_detector_dict = detector__nest_parameter_dict, # NOTE: replace with 'install_detector_dict' once finished with testing
+            baseline_drift_field_v_cm = detector__drift_field_v_cm,
+            detector_dict = {},
+            detector_name = detector__detector_name,
+            abspath_list_detector_dict_json_output = [],
+            flag_verbose = flag_verbose_low_level,
+            flag_print_stdout_and_stderr = False,)
+        nr_spectrum_signature = execNEST(
+            spectrum_dict = spectrum_components_dict["nr_background"]["integral_spectrum_dict"],
+            baseline_detector_dict = detector__nest_parameter_dict, # NOTE: replace with 'install_detector_dict' once finished with testing
+            baseline_drift_field_v_cm = detector__drift_field_v_cm,
+            detector_dict = {},
+            detector_name = detector__detector_name,
+            abspath_list_detector_dict_json_output = [],
+            flag_verbose = flag_verbose_low_level,
+            flag_print_stdout_and_stderr = False,)
 
-    if flag_verbose : print(f"\treducing PDF signatures to WIMP EROI for 'er_background' and 'nr_background'")
+    if flag_verbose : print(f"\treducing 'er_background' and 'nr_background' signatures to WIMP EROI")
     er_spectrum_signature_in_eroi = reduce_nest_signature_to_eroi(
         sim_ndarray = er_spectrum_signature,
         eroi = limit__er_eroi_kev,
@@ -2980,57 +2999,76 @@ def calculate_wimp_parameter_exclusion_curve_dict(
         eroi = limit__er_eroi_kev,
         detector_dict = detector__nest_parameter_dict)
 
-    if flag_verbose : print(f"\tdetermining PDF bin edges for 'er_background' and 'nr_background'")
+    if flag_verbose : print(f"\tdetermining PDF bin edges for 'er_background', 'nr_background', and 'wimps'")
     spectral_pdf_bin_edges_cs1 = list(np.linspace(
-        start = np.min(np.min(er_spectrum_signature_in_eroi["S1_3Dcor [phd]"]),np.min(nr_spectrum_signature_in_eroi["S2_3Dcor [phd]"])),
-        stop = np.max(np.max(er_spectrum_signature_in_eroi["S1_3Dcor [phd]"]),np.max(nr_spectrum_signature_in_eroi["S2_3Dcor [phd]"])),
+        start = np.min([np.min(er_spectrum_signature_in_eroi["S1_3Dcor [phd]"]),np.min(nr_spectrum_signature_in_eroi["S1_3Dcor [phd]"])]),
+        stop = np.max([np.max(er_spectrum_signature_in_eroi["S1_3Dcor [phd]"]),np.max(nr_spectrum_signature_in_eroi["S1_3Dcor [phd]"])]),
         num = limit__number_of_cs1_bins,
         endpoint = True))
     spectral_pdf_bin_edges_cs2 = list(np.geomspace(
-        start = np.min(np.min(er_spectrum_signature_in_eroi["S2_3Dcorr [phd]"]),np.min(nr_spectrum_signature_in_eroi["S2_3Dcorr [phd]"])),
-        stop = np.max(np.max(er_spectrum_signature_in_eroi["S2_3Dcorr [phd]"]),np.max(nr_spectrum_signature_in_eroi["S2_3Dcorr [phd]"])),
+        start = np.min([np.min(er_spectrum_signature_in_eroi["S2_3Dcorr [phd]"]),np.min(nr_spectrum_signature_in_eroi["S2_3Dcorr [phd]"])]),
+        stop = np.max([np.max(er_spectrum_signature_in_eroi["S2_3Dcorr [phd]"]),np.max(nr_spectrum_signature_in_eroi["S2_3Dcorr [phd]"])]),
         num = limit__number_of_cs2_bins,
         endpoint = True))[::-1] # note, that the cS2 bins start with the highest bin edge first
-
-    if flag_verbose : print(f"\tcalculating spectral PDFs for 'er_background' and 'nr_background'")
-    for spectrum_string in ["er_background", "nr_background"]:
-        eroi_signature = er_spectrum_signature_in_eroi if spectrum_string=="er_background" else nr_spectrum_signature_in_eroi
-        spectrum_components_dict.update({
+    for spectrum_string in ["er_background", "nr_background", "wimps"]:
+        spectrum_components_dict[spectrum_string].update({
             "spectral_pdf" : {
                 "cs2_bin_edges" : spectral_pdf_bin_edges_cs2, # note, that the cS2 bins start with the highest bin edge first
                 "cs1_bin_edges" : spectral_pdf_bin_edges_cs1,
-                "pdf" : [],
+                "pdf" : [],},})
 
-            },
-        })
-        for m, cs2_top_bin_edge in enumerate(spectral_pdf_bin_edges_cs2):
+    for spectrum_string in ["er_background", "nr_background"]:
+        if flag_verbose : print(f"\tcalculating spectral PDFs for '{spectrum_string}'")
+        eroi_signature = er_spectrum_signature_in_eroi if spectrum_string=="er_background" else nr_spectrum_signature_in_eroi
+        for m, cs2_top_bin_edge in enumerate(spectral_pdf_bin_edges_cs2[:-1]):
             pdf_line = []
-            for n, cs1_left_bin_edge in enumerate(spectral_pdf_bin_edges_cs1):
+            for n, cs1_left_bin_edge in enumerate(spectral_pdf_bin_edges_cs1[:-1]):
                 pdf_val = len(eroi_signature[
-                    (eroi_signature["S2_3Dcorr [phd]"] <= spectral_pdf_bin_edges_cs2[k] ) &
-                    (eroi_signature["S2_3Dcorr [phd]"] > spectral_pdf_bin_edges_cs2[k+1] ) &
-                    (eroi_signature["S2_3Dcorr [phd]"] >= spectral_pdf_bin_edges_cs1[k] ) &
-                    (eroi_signature["S2_3Dcorr [phd]"] < spectral_pdf_bin_edges_cs1[k+1] )
+                    (eroi_signature["S2_3Dcorr [phd]"] <= spectral_pdf_bin_edges_cs2[m] ) &
+                    (eroi_signature["S2_3Dcorr [phd]"] > spectral_pdf_bin_edges_cs2[m+1] ) &
+                    (eroi_signature["S1_3Dcor [phd]"] >= spectral_pdf_bin_edges_cs1[n] ) &
+                    (eroi_signature["S1_3Dcor [phd]"] < spectral_pdf_bin_edges_cs1[n+1] )
                 ])/len(eroi_signature)
                 pdf_line.append(pdf_val)
             spectrum_components_dict[spectrum_string]["spectral_pdf"]["pdf"].append(pdf_line)
 
-    if flag_verbose : print(f"\tdeleting PDF signatures for 'er_background' and 'nr_background'")
+    if flag_verbose : print(f"\tdeleting 'er_background' and 'nr_background' signatures used to calculate the PDFs")
     del(er_spectrum_signature)
     del(nr_spectrum_signature)
 
     if flag_plot_pdfs:
-        if flag_verbose : print(f"\tplotting spectral PDFs for 'er_background' and 'nr_background'")
-        plt.hist2d(
-            x = ,
-            y = ,
-            bins = [bin_edges_x, bin_edges_y[::-1]],
-            weights = ,
-            cmap = "YlGnBu",
-            cmin = 0.00000001,
-#            norm = colors.LogNorm(),
-        )
-        plt.show()
+        for spectrum_string in ["er_background", "nr_background"]:
+            if flag_verbose : print(f"\tplotting spectral PDF for '{spectrum_string}'")
+            x_list = []
+            y_list = []
+            weights_list = []
+            for k, bin_edge_y_top in enumerate(spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs2_bin_edges"][:-1]):
+                for l, bin_edge_x_left in enumerate(spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs1_bin_edges"][:-1]):
+                    x_list.append(spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs1_bin_edges"][l] +0.5*(spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs1_bin_edges"][l+1]-spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs1_bin_edges"][l]))
+                    y_list.append(spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs2_bin_edges"][k] -0.5*(spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs2_bin_edges"][k]-spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs2_bin_edges"][k+1]))
+                    weights_list.append(spectrum_components_dict[spectrum_string]["spectral_pdf"]["pdf"][k][l])
+            fig = plt.figure(
+                figsize = [5.670, 5.670*9/16],
+                dpi = 150,
+                constrained_layout = True)
+            ax1 = fig.add_subplot()
+            hist = ax1.hist2d(
+                x = x_list,
+                y = y_list,
+                bins = [spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs1_bin_edges"], spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs2_bin_edges"][::-1]],
+                weights = weights_list,
+                cmap = "YlGnBu",
+                cmin = 0.00000000001,)
+            if spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs2_bin_edges"][0]-spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs2_bin_edges"][1] != spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs2_bin_edges"][1]-spectrum_components_dict[spectrum_string]["spectral_pdf"]["cs2_bin_edges"][2]: ax1.set_yscale('log')
+            ax1.set_xlabel(r"$cS_1$ / $\mathrm{phd}$", fontsize=11)
+            ax1.set_ylabel(r"$cS_2$ / $\mathrm{phd}$", fontsize=11)
+            plt.show()
+
+
+
+
+
+
 
 
     # defining likelihood function and test statistic
