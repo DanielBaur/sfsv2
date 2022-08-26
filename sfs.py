@@ -13,6 +13,7 @@ import json
 import scipy.integrate as integrate
 import scipy.constants as constants
 from scipy.integrate import quad
+from scipy.stats import rv_continuous
 import math
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -234,7 +235,7 @@ def compute_drift_velocity_from_detector_configuration(
     # initialization
     fn = "compute_drift_velocity_from_detector_configuration"
     Kelvin = detector_dict["T_Kelvin"] # extracting LXe temperatire in K
-    eField = drift_field_v_cm # extracting drift field in V/cm
+    eField = float(drift_field_v_cm) # extracting drift field in V/cm
     assert (Kelvin >= 100 and Kelvin <= 230), f"{fn}: temperature out of range"
 
     speed = 0.0
@@ -1440,172 +1441,166 @@ def give_differential_rate_for_mc_output(
 
 
 def give_spectrum_dict(
-    spectrum_name,
-    recoil_energy_kev_list,
+    spectrum_name,                      # string, name of the spectrum to be sampled from, corresponding to one of the keys of 'spectrum_dict_default_dict'
+    recoil_energy_kev_list,             # list of two floats, resembling the energy interval within which events are generated
     # 
-    abspath_spectra_files,
-    exposure_t_y = 40*5,
-    num_events = -1,
+    abspath_spectra_files,              # abspath, directory where the .csv files of the spectra are found
+    exposure_t_y                        = 30*5, # float, fiducial exposure of the experiment
+    num_events                          = [42, "exposure_rounded", "exposure_poisson"][2], # number of generated events, giving an integer will generate exactly that many events, giving 'exposure' will generate events according to 'exposure_t_y' (rounded to the next integer value), giving 'exposure_poisson' will generate an random integer number of events corresponding to a sample drawn from a Poissonian distribution with the parameter corresponding to the exposure of the experiment
     # nest parameters
-    seed = 0, # integer between 0 and 10000000, or "randomint" to generate a random integer between 0 and 10000000
-    drift_field_v_cm = 200,
-    xyz_pos_mm = "-1",
+    seed                                = 0, # integer between 0 and 10000000, or "randomint" to generate a random integer between 0 and 10000000
+    drift_field_v_cm                    = 200,
+    xyz_pos_mm                          = "-1",
     # flags
-    flag_spectrum_type = ["differential", "integral"][0],
-    flag_verbose = False,
-    flag_return_non_integer_events = False,
-    flag_inhibit_scaling = False,
+    flag_spectrum_type                  = ["differential", "integral"][0],
+    flag_verbose                        = False,
+    flag_return_non_integer_events      = False,
+    flag_inhibit_scaling                = False,
     # keywords
-    spectrum_dict_default_values = spectrum_dict_default_dict, # default 'spectrum_dict' values
-    **kwargs, # additional keyword argument values overwriting those from 'spectrum_dict_default_values'
+    spectrum_dict_default_values        = spectrum_dict_default_dict, # default 'spectrum_dict' values
+    differential_rate_parameters        = {} # additional keyword argument values overwriting those from 'spectrum_dict_default_values'
 ):
 
     """
     This function is used to generate a 'spectrum_dict' based on one of the templates in 'spectrum_dict_default_dict'.
     If 'flag_spectrum_type' == "differential" the 'spectrum_dict' resembles the differential rate (in events per tonne x year x keV, computed for every 'recoil_energy_kev' value).
     If 'flag_spectrum_type' == "integral" the 'spectrum_dict' resembles the integrated number of events per aequidistant recoil energy bin (bin centers are given by the 'recoil_energy_kev' values).
+    An obtained 'integral'-type 'spectrum_dict' would typically be fed into NEST for further processing.
     """
 
     # initializing
     fn = "give_spectrum_dict"
-    if flag_verbose: print(f"{fn}: initializing 'spectrum_dict'")
-    if flag_verbose: print(f"\tcopying entry from 'spectrum_dict_default_values'")
+    if flag_verbose: print(f"{fn}: initializing '{fn}'")
+
+    # instantiating the 'spectrum_dict'
+    if flag_verbose: print(f"{fn}: instantiating the 'spectrum_dict'")
     spectrum_dict = spectrum_dict_default_values[spectrum_name].copy()
-    if flag_verbose: print(f"\tupdating 'spectrum_dict' with specified keyword arguments")
     spectrum_dict.update({
-        "recoil_energy_kev_list"    : list(recoil_energy_kev_list),
-        "exposure_t_y"              : exposure_t_y,
-        "num_events"                : num_events,
-        "seed"                      : seed,
-        "field_drift[V/cm]"         : drift_field_v_cm,
-        "x,y,z-position[mm]"        : xyz_pos_mm,
-        "flag_verbose"              : flag_verbose,
-        "flag_spectrum_type"        : flag_spectrum_type,
+        "recoil_energy_kev_list"        : list(recoil_energy_kev_list),
+        "exposure_t_y"                  : exposure_t_y,
+        "num_events"                    : num_events,
+        "seed"                          : seed,
+        "field_drift[V/cm]"             : drift_field_v_cm,
+        "x,y,z-position[mm]"            : xyz_pos_mm,
+        "flag_verbose"                  : flag_verbose,
+        "flag_spectrum_type"            : flag_spectrum_type,
+        "differential_rate_parameters"  : differential_rate_parameters,
     })
-    for k in [*kwargs]:
-        if k == "differential_rate_parameters":
-            for kk in [*kwargs["differential_rate_parameters"]]:
-                spectrum_dict["differential_rate_parameters"].update({kk:kwargs["differential_rate_parameters"][kk]})
-        else:
-            spectrum_dict.update({k:kwargs[k]})
 
-    # case: specified spectrum is sum of many constituent profiles ---> recursively compute the 'spectrum_dict' for every constituent dictionary
+    # looping over the constituent spectra and defining the combined spectrum differential rate function
+    if flag_verbose: print(f"{fn}: defining the combined differential rate function")
+    binwidth_kev = recoil_energy_kev_list[1]-recoil_energy_kev_list[0]
+    recoil_energy_kev_min = recoil_energy_kev_list[0] -0.5*binwidth_kev
+    recoil_energy_kev_max = recoil_energy_kev_list[-1] +0.5*binwidth_kev
+    bin_edges_kev = np.linspace(start=recoil_energy_kev_min, stop=recoil_energy_kev_max, num=len(recoil_energy_kev_list)+1, endpoint=True)
+    x_combined_differential_rate_spectrum = np.linspace(start=recoil_energy_kev_min, stop=recoil_energy_kev_max, num=3001, endpoint=True)
     if spectrum_dict["differential_rate_computation"] == "spectrum_sum":
-        constituent_spectrum_dict_list = []
-        # recursively computing the 'spectrum_dict's for all constituent spectra
-        for constituent_spectrum_name in spectrum_dict["constituent_spectra_list"]:
-            constituent_spectrum_dict_list.append(give_spectrum_dict(
-                spectrum_name = constituent_spectrum_name,
-                recoil_energy_kev_list = recoil_energy_kev_list,
-                abspath_spectra_files = abspath_spectra_files,
-                exposure_t_y = exposure_t_y,
-                num_events = num_events,
-                seed = seed,
-                drift_field_v_cm = drift_field_v_cm,
-                xyz_pos_mm = xyz_pos_mm,
-                flag_spectrum_type = flag_spectrum_type,
-                flag_verbose = flag_verbose,
-                flag_return_non_integer_events = True,
-                flag_inhibit_scaling = True,
-                spectrum_dict_default_values = spectrum_dict_default_values,
-                **kwargs,
-            ))
-        # summing the number of entries of the individual constituent dicts
-        #spectrum_dict = constituent_spectrum_dict_list[0].copy()
-        if spectrum_dict["flag_spectrum_type"] == "differential":
-            y_data_summed = compute_array_sum([csd["differential_recoil_rate_events_t_y_kev"] for csd in constituent_spectrum_dict_list])
-            spectrum_dict.update({
-                "differential_recoil_rate_events_t_y_kev" : y_data_summed})
-        elif spectrum_dict["flag_spectrum_type"] == "integral":
-            y_data_summed = compute_array_sum([csd["numEvts"] for csd in constituent_spectrum_dict_list])
-            if num_events > 0:
-                total = np.sum(y_data_summed)
-                num_scale_factor = num_events/total
-                y_data_summed = [num_scale_factor*noe for noe in y_data_summed]
-            y_data_summed = [round(noe) for noe in y_data_summed]
-            spectrum_dict.update({
-                "numEvts"               : list(y_data_summed),
-                "type_interaction"      : str(constituent_spectrum_dict_list[0]["type_interaction"]),
-                "E_min[keV]"            : list(recoil_energy_kev_list),
-                "E_max[keV]"            : list(recoil_energy_kev_list),
-            })
-
-        # returning the 'spectrum_dict' with summed entries
-        if callable(spectrum_dict["differential_rate_computation"]):
-            spectrum_dict.pop("differential_rate_computation")
-        return spectrum_dict
-
-    # case: specified spectrum is a single profile ---> infer differential rate and - if specified - integrated rate
+        constituent_spectra_list = spectrum_dict["constituent_spectra_list"]
+        flag_spectrum_sum = True
     else:
-
-        # inferring the differential rate computation method
-        if flag_verbose: print(f"{fn}: assessing differential rate computation method")
-        if spectrum_dict["differential_rate_computation"] == "interpolation_from_file":
-            digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_files +spectrum_name +".csv")
+        constituent_spectra_list = [spectrum_name]
+        flag_spectrum_sum = False
+    constituent_spectra_differential_rate_list_list = []
+    for constituent_spectrum in constituent_spectra_list:
+        if spectrum_dict_default_values[constituent_spectrum]["differential_rate_computation"] == "interpolation_from_file":
+            digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_files +constituent_spectrum +".csv")
             differential_rate_function = np.interp
             differential_rate_param_dict = {"xp" : digitized_spectrum_ndarray["x_data"], "fp" : digitized_spectrum_ndarray["y_data"], "left" : digitized_spectrum_ndarray["y_data"][0], "right" : 0}
-        elif spectrum_dict["differential_rate_computation"] == "mc_output":
-            digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_files +spectrum_name +".csv")
+        elif spectrum_dict_default_values[constituent_spectrum]["differential_rate_computation"] == "mc_output":
+            digitized_spectrum_ndarray = convert_grabbed_csv_to_ndarray(abspath_spectra_files +constituent_spectrum +".csv")
             differential_rate_function = give_differential_rate_for_mc_output
             differential_rate_param_dict = {"xp" : digitized_spectrum_ndarray["x_data"], "fp" : digitized_spectrum_ndarray["y_data"], "left" : digitized_spectrum_ndarray["y_data"][0], "right" : 0}
-        elif callable(spectrum_dict["differential_rate_computation"]):
-            differential_rate_function = spectrum_dict["differential_rate_computation"]
+        elif callable(spectrum_dict_default_values[constituent_spectrum]["differential_rate_computation"]):
+            differential_rate_function = spectrum_dict_default_values[constituent_spectrum]["differential_rate_computation"]
             differential_rate_param_dict = spectrum_dict["differential_rate_parameters"]
+        constituent_spectrum_differential_rate_list = [differential_rate_function(x, **differential_rate_param_dict) for x in x_combined_differential_rate_spectrum]
+        constituent_spectra_differential_rate_list_list.append(constituent_spectrum_differential_rate_list)
+    y_combined_differential_rate_spectrum = compute_array_sum(constituent_spectra_differential_rate_list_list)
+    def differential_spectrum_rate_events_t_y_kev(recoil_energy_kev):
+        differential_rate_events_t_y_kev = np.interp(recoil_energy_kev, xp=x_combined_differential_rate_spectrum, fp=y_combined_differential_rate_spectrum, right=0)
+        return differential_rate_events_t_y_kev
 
-        # case: computing the differential rate
-        if spectrum_dict["flag_spectrum_type"] == "differential":
-            if flag_verbose: print(f"{fn}: computing the differential rate")
-            differential_recoil_rate_events_t_y_kev = [differential_rate_function(e, **differential_rate_param_dict) for e in recoil_energy_kev_list]
-            spectrum_dict.update({
-                "recoil_energy_kev_list"                        : list(recoil_energy_kev_list),
-                "differential_recoil_rate_events_t_y_kev"       : list(differential_recoil_rate_events_t_y_kev),
-            })
+    # case: returning differential 'spectrum_dict'
+    if  flag_spectrum_type == "differential":
+        if flag_verbose: print(f"{fn}: returning 'differential'-type 'spectrum_dict'")
+        differential_recoil_rate_events_t_y_kev = [differential_spectrum_rate_events_t_y_kev(e) for e in recoil_energy_kev_list]
+        spectrum_dict.update({
+            "differential_recoil_rate_events_t_y_kev"       : list(differential_recoil_rate_events_t_y_kev),
+        })
 
-        # case: computing the integrated rate
-        # code adapted from C. Hock's 'give_spectrum' function
-        elif spectrum_dict["flag_spectrum_type"] == "integral":
-            # computing the number of events per energy bin via integration
-            binwidth_kev = recoil_energy_kev_list[1] -recoil_energy_kev_list[0]
-            recoil_energy_kev_bin_edges_list = [bc-0.5*binwidth_kev for bc in recoil_energy_kev_list] +[recoil_energy_kev_list[-1]+0.5*binwidth_kev]
-            args_tuple = (differential_rate_param_dict[key] for key in [*differential_rate_param_dict])
-            number_of_events_per_energy_bin = [
-                integrate.quad(
-                    differential_rate_function,
-                    bc-0.5*binwidth_kev,
-                    bc+0.5*binwidth_kev,
-                    args = tuple([differential_rate_param_dict[key] for key in [*differential_rate_param_dict]])
-                )[0] for bc in recoil_energy_kev_list]
-            # scaling the integrated number of events either according to 'exposure_t_y' or to 'num_events'
-            if num_events <= 0:
-                number_of_events_per_energy_bin = [noe*exposure_t_y for noe in number_of_events_per_energy_bin]
-            elif num_events > 0 and flag_inhibit_scaling == False:
-                total = np.sum(number_of_events_per_energy_bin)
-                num_scale_factor = num_events/total
-                number_of_events_per_energy_bin = [num_scale_factor*noe for noe in number_of_events_per_energy_bin]
-            # rounding the entries of 'number_of_events_per_energy_bin' to integer values:
-            if flag_return_non_integer_events == False:
-                number_of_events_per_energy_bin = [round(noe) for noe in number_of_events_per_energy_bin]
-            # updating the 'spectrum_dict'
-            if flag_verbose: print(f"{fn}: computing the integrated rate")
-            spectrum_dict.update({
-                "numEvts"               : list(number_of_events_per_energy_bin),
-                "type_interaction"      : list(spectrum_name.split("_"))[0].upper(),
-                "E_min[keV]"            : list(recoil_energy_kev_list),
-                "E_max[keV]"            : list(recoil_energy_kev_list),
-                "field_drift[V/cm]"     : str(drift_field_v_cm),
-                "x,y,z-position[mm]"    : str(xyz_pos_mm),
-                "seed"                  : str(seed),})
+    # case: returning integral 'spectrum_dict'
+    elif flag_spectrum_type == "integral":
+        if flag_verbose: print(f"{fn}: returning 'integral'-type 'spectrum_dict'")
 
-    # returning the 'spectrum_dict'
-    if flag_verbose: print(f"{fn}: finished compiling the 'spectrum_dict'")
-    if callable(spectrum_dict["differential_rate_computation"]):
+        # determining the expected number of events given the experiment's exposure
+        if flag_verbose: print(f"\tdetermining the expected number of events given the experiment's exposure")
+        expected_number_of_events_float_per_energy_bin = [exposure_t_y *integrate.quad(
+            differential_spectrum_rate_events_t_y_kev,
+            bc -0.5*binwidth_kev,
+            bc +0.5*binwidth_kev,
+        )[0] for bc in recoil_energy_kev_list]
+        expected_number_of_events_float = np.sum(expected_number_of_events_float_per_energy_bin)
+        expected_number_of_events_rounded = round(expected_number_of_events_float)
+        expected_number_of_events_poisson = np.random.default_rng(seed=seed).poisson(expected_number_of_events_float, 1)[0]
+        if flag_verbose: print(f"\t---> 'float': {expected_number_of_events_float}")
+        if flag_verbose: print(f"\t---> 'rounded': {expected_number_of_events_rounded}")
+        if flag_verbose: print(f"\t---> 'poisson': {expected_number_of_events_poisson}")
+
+        # drawing the samples from the custom spectrum pdf according to the specified number of events 'num_events'
+        if type(num_events)==int:
+            n_samples = num_events
+        elif num_events=="exposure_rounded":
+            n_samples = expected_number_of_events_rounded
+        elif num_events=="exposure_poisson":
+            n_samples = expected_number_of_events_poisson
+        if flag_verbose: print(f"\tdrawing {n_samples} samples from the custom spectrum pdf")
+        samples = generate_samples_from_discrete_pdf(
+            random_variable_values = recoil_energy_kev_list,
+            pdf_values = expected_number_of_events_float_per_energy_bin,
+            nos = n_samples,
+            seed = seed,)
+#        if flag_verbose: print(f"\tsamples: {samples}")
+
+        # histogramming the drawn samples according to the specified bin centers 'recoil_energy_kev_list'
+        if flag_verbose: print(f"\thistogramming the drawn samples")
+        hist, hist_bin_edges = np.histogram(a=samples, bins=np.linspace(start=recoil_energy_kev_min, stop=recoil_energy_kev_max, num=len(recoil_energy_kev_list)+1, endpoint=True))
+
+        # assembling the 'integral'-type 'spectrum_dict'
+        if flag_verbose: print(f"\tupdating the 'integral'-type 'spectrum_dict'")
+        interaction_type = list(spectrum_name.split("_"))[0].upper() if flag_spectrum_sum == True else list(spectrum_name.split("_"))[1].upper()
+        interaction_type = "ER" if "er" in list(spectrum_name.split("_")) else "NR"
+        print(f"interaction_type: {interaction_type}")
+        spectrum_dict.update({
+            "numEvts"               : [int(entry) for entry in hist],
+            "type_interaction"      : interaction_type,
+            "E_min[keV]"            : list(recoil_energy_kev_list),
+            "E_max[keV]"            : list(recoil_energy_kev_list),
+            "field_drift[V/cm]"     : str(drift_field_v_cm),
+            "x,y,z-position[mm]"    : str(xyz_pos_mm),
+            "seed"                  : str(seed),})
+
+    # finishing
+    if flag_verbose: print(f"{fn}: finished")
+    if callable(spectrum_dict["differential_rate_computation"]): # functions cannot be JSON-serialized
         spectrum_dict.pop("differential_rate_computation")
     return spectrum_dict
+
+
+
+
+
+
+
+
+
+
+
 
 
 def gen_spectrum_plot(
     spectra_list, # list of 'spectra_dict' keys, e.g., ["nr_wimps", "nr_atm", "nr_dsnb"]
     abspath_spectra_files,
+    differential_rate_parameters = {},
     # plot parameters
     plot_fontsize_axis_label = 11,
     plot_figure_size_x_inch = 5.670,
@@ -1683,7 +1678,8 @@ def gen_spectrum_plot(
             spectrum_dict = give_spectrum_dict(
                 spectrum_name = spectrum,
                 recoil_energy_kev_list = x_data_recoil_energy_kev,
-                abspath_spectra_files = abspath_spectra_files,)
+                abspath_spectra_files = abspath_spectra_files,
+                differential_rate_parameters = differential_rate_parameters)
             plot_x_data = spectrum_dict["recoil_energy_kev_list"]
             plot_y_data = spectrum_dict["differential_recoil_rate_events_t_y_kev"]
 
@@ -2084,6 +2080,7 @@ def execNEST(
                     cmd_list.append(cmd_string)
 
     ### looping over all commands and executing them
+    if flag_verbose: print(f"{fn}: executing the 'execNEST' command strings")
     for k, cmd_string in enumerate(cmd_list):
 
         # executing the 'execNEST' C++ executable
@@ -2883,6 +2880,34 @@ def infer_two_dimensional_pdf_value_for_observation(
     return pdf[y_index][x_index]
 
 
+def generate_samples_from_discrete_pdf(
+    random_variable_values,   # list of floats, representing the possible random variable values
+    pdf_values,               # list of floats, representing the discrete probabilities of the random variable values
+    nos,                      # int, number of samples to be generated
+    seed                      = randrange(10000001), # int, random seed for drawing samples
+):
+
+    """
+    This function is used to draw 'nos'-many samples from a discrete probability density function.
+    """
+
+    cumulative_pdf_values = [np.sum(pdf_values[:k])for k in range(len((pdf_values))+1)]
+    #print(f"'cumulative_pdf_values' : {cumulative_pdf_values})
+    random_uniform_samples_within_cumulative_pdf_values_edges = np.random.default_rng(seed=seed).uniform(0, cumulative_pdf_values[-1],nos)
+    random_uniform_samples_index_list = []
+    for rus in random_uniform_samples_within_cumulative_pdf_values_edges:
+        if rus==0:
+            index = 0
+        else:
+            red_bin_edges = cumulative_pdf_values[1:] # neglecting 0-th bin-edge
+            difference_betweeen_bin_edge_and_rus = np.array(red_bin_edges -rus)
+            difference_betweeen_bin_edge_and_rus = np.array([np.inf if dval <0 else dval for dval in difference_betweeen_bin_edge_and_rus])
+            index = np.argmin(difference_betweeen_bin_edge_and_rus)
+        random_uniform_samples_index_list.append(index)
+    samples = list([float(random_variable_values[index]) for index in random_uniform_samples_index_list])
+    return samples
+
+
 def calculate_wimp_parameter_exclusion_curve_dict(
     # physical detector parameters
     detector__drift_field_v_cm,                                     # electrical drift field strength of the detector in V/cm
@@ -3067,7 +3092,7 @@ def calculate_wimp_parameter_exclusion_curve_dict(
                 pdf_val = len(eroi_signature[
                     (eroi_signature["S2_3Dcorr [phd]"] <= spectral_pdf_bin_edges_cs2[m] ) &
                     (eroi_signature["S2_3Dcorr [phd]"] > spectral_pdf_bin_edges_cs2[m+1] ) &
-                    (eroi_signature["S1_3Dcor [phd]"] =< spectral_pdf_bin_edges_cs1[n+1] ) &
+                    (eroi_signature["S1_3Dcor [phd]"] <= spectral_pdf_bin_edges_cs1[n+1] ) &
                     (eroi_signature["S1_3Dcor [phd]"] > spectral_pdf_bin_edges_cs1[n] )
                 ])/len(eroi_signature)
                 pdf_line.append(pdf_val)
