@@ -2979,6 +2979,84 @@ def generate_two_dimensional_pdf_from_ndarray(
     return pdf_array
 
 
+def compute_expected_number_of_events_within_eroi(
+    spectrum_name,                  # 
+    detector_dict,                  # 
+    recoil_energy_kev_list,         # 
+    abspath_spectra_files,          # 
+    exposure_t_y,                   # 
+    drift_field_v_cm,               # 
+    xyz_pos_mm,                     # 
+    spectrum_dict_default_values,   # 
+    differential_rate_parameters,   # 
+    number_of_simulated_signatures  = 100, # int, number of NEST-simulated signatures
+    selection_window_recoil_energy  = [], # 
+    selection_window_s1             = [], # 
+    selection_window_s2             = [], # 
+    flag_verbose                    = False, # flag indicating whether or not text output will be printed onto the screen
+):
+
+    """
+    This function is used to compute the expected number of events within the WIMP EROI by simulating Poisson-fluctuating datasets, selecting the events falling within the EROI and averaging over all simulations.
+    """
+
+    # initialization
+    fn = "compute_expected_number_of_events_within_eroi"
+    number_of_events_within_eroi_list = []
+    if flag_verbose : print(f"\n{fn}: initializing '{fn}'")
+
+    # generating the 'spectrum_dict's
+    if flag_verbose : print(f"\t\tgenerating the 'spectrum_dict's")
+    spectrum_dict_list = give_spectrum_dict(
+        spectrum_name                           = spectrum_name,
+        recoil_energy_kev_list                  = recoil_energy_kev_list,
+        abspath_spectra_files                   = abspath_spectra_files,
+        exposure_t_y                            = exposure_t_y,
+        num_events                              = "exposure_poisson",
+        seed                                    = randrange(10000001),
+        drift_field_v_cm                        = drift_field_v_cm,
+        xyz_pos_mm                              = xyz_pos_mm,
+        flag_spectrum_type                      = "integral",
+        flag_verbose                            = False,
+        flag_return_non_integer_events          = False,
+        flag_inhibit_scaling                    = False,
+        flag_number_of_output_spectrum_dicts    = number_of_simulated_signatures,
+        spectrum_dict_default_values            = spectrum_dict_default_values,
+        differential_rate_parameters            = differential_rate_parameters,)
+
+    # simulating 'number_of_simulated_signatures'-many signatures
+    if flag_verbose : print(f"{fn}: simulating '{number_of_simulated_signatures}'-many signatures")
+    for k in range(len(spectrum_dict_list)):
+        if flag_verbose : print(f"\tk={k}/{number_of_simulated_signatures}")
+
+        # simulating the detector signature with NEST
+        if flag_verbose : print(f"\t\tsimulating the detector signature with NEST")
+        signature_data = execNEST(
+            spectrum_dict               = spectrum_dict_list[k],
+            baseline_drift_field_v_cm   = drift_field_v_cm,
+            baseline_detector_dict      = detector_dict,
+            detector_dict = {},)
+
+        # selecting the events falling into the EROI
+        if flag_verbose : print(f"\t\tselecting the events falling into the EROI")
+        reduced_signature_data = reduce_nest_signature_to_eroi(
+            sim_ndarray             = signature_data,
+            detector_dict           = detector_dict,
+            eroi                    = selection_window_recoil_energy,
+            s1_selection_window     = selection_window_s1,
+            s2_selection_window     = selection_window_s2,)
+        number_of_events_within_eroi = len(reduced_signature_data)
+        number_of_events_within_eroi_list.append(number_of_events_within_eroi)
+
+    # computing the expectation value as the arithmetic mean of all extracted numbers
+    if flag_verbose : print(f"{fn}: computing expectation value as arithmetic mean")
+    #print(f"'number_of_events_within_eroi_list' = {number_of_events_within_eroi_list}")
+    number_of_events_within_eroi_expectation_value = np.mean(number_of_events_within_eroi_list)
+    if flag_verbose : print(f"\t-----> {number_of_events_within_eroi_expectation_value:.2f}")
+
+    return number_of_events_within_eroi_expectation_value
+
+
 
 
 
@@ -3230,92 +3308,7 @@ def calculate_wimp_parameter_exclusion_curve(
     # a priori calculations: ER and NR expectation values
     if flag_verbose : print(f"\tcalculating the expected number of ER and NR background events within the binned observable space")
     if [False,True][1]:
-
-
-
-
-
-        def compute_expected_number_of_events_within_eroi(
-            spectrum_name,                  # 
-            detector_dict,                  # 
-            recoil_energy_kev_list,         # 
-            abspath_spectra_files,          # 
-            exposure_t_y,                   # 
-            drift_field_v_cm,               # 
-            xyz_pos_mm,                     # 
-            spectrum_dict_default_values,   # 
-            differential_rate_parameters,   # 
-            number_of_simulated_signatures  = 100, # int, number of NEST-simulated signatures
-            selection_window_recoil_energy  = [], # 
-            selection_window_s1             = [], # 
-            selection_window_s2             = [], # 
-            flag_verbose                    = False, # flag indicating whether or not text output will be printed onto the screen
-        ):
-
-            """
-            This function is used to compute the expected number of events within the WIMP EROI by simulating Poisson-fluctuating datasets, selecting the events falling within the EROI and averaging over all simulations.
-            """
-
-            # initialization
-            fn = "compute_expected_number_of_events_within_eroi"
-            number_of_events_within_eroi_list = []
-            if flag_verbose : print(f"\n{fn}: initializing '{fn}'")
-
-            # generating the 'spectrum_dict's
-            if flag_verbose : print(f"\t\tgenerating the 'spectrum_dict's")
-            spectrum_dict_list = give_spectrum_dict(
-                spectrum_name                           = spectrum_name,
-                recoil_energy_kev_list                  = recoil_energy_kev_list,
-                abspath_spectra_files                   = abspath_spectra_files,
-                exposure_t_y                            = exposure_t_y,
-                num_events                              = "exposure_poisson",
-                seed                                    = randrange(10000001),
-                drift_field_v_cm                        = drift_field_v_cm,
-                xyz_pos_mm                              = xyz_pos_mm,
-                flag_spectrum_type                      = "integral",
-                flag_verbose                            = False,
-                flag_return_non_integer_events          = False,
-                flag_inhibit_scaling                    = False,
-                flag_number_of_output_spectrum_dicts    = number_of_simulated_signatures,
-                spectrum_dict_default_values            = spectrum_dict_default_values,
-                differential_rate_parameters            = differential_rate_parameters,)
-
-            # simulating 'number_of_simulated_signatures'-many signatures
-            if flag_verbose : print(f"{fn}: simulating '{number_of_simulated_signatures}'-many signatures")
-            for k in range(len(spectrum_dict_list)):
-                if flag_verbose : print(f"\tk={k}/{number_of_simulated_signatures}")
-
-                # simulating the detector signature with NEST
-                if flag_verbose : print(f"\t\tsimulating the detector signature with NEST")
-                signature_data = execNEST(
-                    spectrum_dict               = spectrum_dict_list[k],
-                    baseline_drift_field_v_cm   = drift_field_v_cm,
-                    baseline_detector_dict      = detector_dict,
-                    detector_dict = {},)
-
-                # selecting the events falling into the EROI
-                if flag_verbose : print(f"\t\tselecting the events falling into the EROI")
-                reduced_signature_data = reduce_nest_signature_to_eroi(
-                    sim_ndarray             = signature_data,
-                    detector_dict           = detector_dict,
-                    eroi                    = selection_window_recoil_energy,
-                    s1_selection_window     = selection_window_s1,
-                    s2_selection_window     = selection_window_s2,)
-                number_of_events_within_eroi = len(reduced_signature_data)
-                number_of_events_within_eroi_list.append(number_of_events_within_eroi)
-
-            # computing the expectation value as the arithmetic mean of all extracted numbers
-            if flag_verbose : print(f"{fn}: computing expectation value as arithmetic mean")
-            #print(f"'number_of_events_within_eroi_list' = {number_of_events_within_eroi_list}")
-            number_of_events_within_eroi_expectation_value = np.mean(number_of_events_within_eroi_list)
-            if flag_verbose : print(f"\t-----> {number_of_events_within_eroi_expectation_value:.2f}")
-
-            return number_of_events_within_eroi_expectation_value
-
-
-
-
-
+        # calculating the ER and NR events expected within the WIMP EROI
         if flag_verbose : print(f"\t\tcalculating the number of ER background events expected within the WIMP EROI")
         number_of_expected_er_background_events_within_wimp_eroi = compute_expected_number_of_events_within_eroi(
             spectrum_name                   = spectrum__er_background_model,
