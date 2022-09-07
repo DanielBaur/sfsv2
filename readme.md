@@ -20,7 +20,7 @@ This challenging sensitivity goal can only be achieved through an unprecedentedl
 
 
 #### Signal Formation Simulation
-SFS is a ``Python3`` software library providing a lightweight framework for the [https://nest.physics.ucdavis.edu/](``NEST``) package to simulate the signal formation process in a liquid xenon time projection chamber.
+SFS is a ``Python3`` software library providing a lightweight framework for the [``NEST``](https://nest.physics.ucdavis.edu/) package to simulate the signal formation process in a liquid xenon time projection chamber.
 This allows us to systematically compare different detector designs and assess their impact on the experiment's sensitivity in a top-down approach.
 
 
