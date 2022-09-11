@@ -28,10 +28,10 @@ This allows us to systematically compare different detector designs and assess t
 
 
 #### Documentation
-Installation and use are documented and showcased in ``sfs.ipynb``.
+For documentation please refer to ``sfs.ipynb`` in which installation and use are described and showcased.
 Therein, my thesis work is exemplarily reproduced.
 Please note that the project is actively being worked on; accordingly, key features are still being implemented.
-In case of any questions, feel free to contact me.
+In case of any questions, feel free to reach out.
 
 
 <br>
