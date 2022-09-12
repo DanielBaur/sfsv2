@@ -3603,6 +3603,8 @@ def calculate_wimp_parameter_exclusion_curve(
 #            print(lambda_nr)
 #            print(lambda_wimps)
 
+
+
 #            # defining the likelihood function
             def neg_likelihood_function(
                 i_sigma, # SI WIMP-nucleon cross-section, Note: due to computational reasons 'lambda_wimps' was defined to correspond to a sigma of 1e-45 --> one needs to correcto for that factor later
@@ -3661,6 +3663,53 @@ def calculate_wimp_parameter_exclusion_curve(
                 llf_val = llf_val -np.log(theta_er_sigma) -0.5*np.log(2*math.pi) -0.5*((theta_er-1)/theta_er_sigma)**2
                 llf_val = llf_val -np.log(theta_nr_sigma) -0.5*np.log(2*math.pi) -0.5*((theta_nr-1)/theta_nr_sigma)**2
                 return np.float64(-1)*llf_val
+
+            def test_neg_log_likelihood_function(
+                i_sigma, # SI WIMP-nucleon cross-section, Note: due to computational reasons 'lambda_wimps' was defined to correspond to a sigma of 1e-45 --> one needs to correcto for that factor later
+                i_theta_er,
+                i_theta_nr,
+            ):
+                # initial definitions
+                llf_val = np.array(0)
+                sigma = np.array(i_sigma)
+                theta_er = np.array(i_theta_er)
+                theta_nr = np.array(i_theta_nr)
+#                print("types:###########")
+#                print(f"type('sigma') = '{type(sigma)}'")
+#                print(f"type('llf_val') = '{type(llf_val)}'")
+#                print(f"type('n_obs_b') = '{type(n_obs_er[2][3])}'")
+#                print(f"type('lambda_er') = '{type(lambda_er)}'")
+#                print(f"type('pdf_er_b') = '{type(pdf_er[2][3])}'")
+                
+                # Poisson factor product: looping over all bins of the cS1-cS2 observable space
+                print(f"\ntlf: start 'test_likelihood_function' call")
+                ctr = 0
+                for b_row, be_row in enumerate(bin_edges_s2[:-1]):
+                    for b_column, be_column in enumerate(bin_edges_s1[:-1]):
+                        n_obs_b = 2*n_obs_er[b_row][b_column] +n_obs_nr[b_row][b_column]
+#                        print(type(pdf_er[b_row][b_column]*lambda_er))
+#                        print(type(theta_er))
+#                        print(type(pdf_nr[b_row][b_column]*lambda_nr))
+#                        print(type(theta_nr))
+#                        print(type(pdf_wimps[b_row][b_column]*lambda_wimps))
+#                        print(type(sigma))
+                        lambda_b = pdf_er[b_row][b_column]*lambda_er*theta_er +pdf_nr[b_row][b_column]*lambda_nr*theta_nr +pdf_wimps[b_row][b_column]*lambda_wimps*sigma
+#                        print(f"sanity check: observed={n_obs_b}, expected={pdf_er[b_row][b_column]*lambda_er+pdf_nr[b_row][b_column]*lambda_nr}")
+                        llf_val = llf_val + n_obs_b*np.log(lambda_b) -lambda_b
+                        print(f"\ntlf: 'ctr'={ctr}")
+                        print(f"tlf: 'n_obs_b'={n_obs_b}")
+                        print(f"tlf: 'lambda_b'={lambda_b}")
+                        print(f"tlf: 'llf_val'={llf_val}")
+                        ctr += 1
+                # Gaussian factor product: looping over the nuissance parameter PDFS
+                llf_val = llf_val -np.log(theta_er_sigma) -0.5*np.log(2*math.pi) -0.5*((theta_er-1)/theta_er_sigma)**2
+                llf_val = llf_val -np.log(theta_nr_sigma) -0.5*np.log(2*math.pi) -0.5*((theta_nr-1)/theta_nr_sigma)**2
+                return np.float64(-1)*llf_val
+
+            print(f"######## start: test_likelihood_function output ########")
+            test_neg_log_likelihood_function(1,1,1)
+            print(f"######## finish: test_likelihood_function output ########")
+            raise Exception(f"HkIWs!")
 
             # plotting the neg_log_likelihood function
             x_data = np.geomspace(start=0.000001, stop=100, num=150, endpoint=True)
