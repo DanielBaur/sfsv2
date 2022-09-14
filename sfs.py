@@ -13,8 +13,10 @@ import json
 import scipy.integrate as integrate
 import scipy.constants as constants
 from scipy.optimize import minimize
+from scipy.optimize import root_scalar
 from scipy.integrate import quad
 from scipy.stats import rv_continuous
+from scipy.stats import chi2
 import math
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -3137,6 +3139,7 @@ def calculate_wimp_parameter_exclusion_curve(
     limit__wimp_mass_gev_list                                        = list(np.geomspace(start=10, stop=500, num=5, endpoint=True)),     # list of WIMP masses in GeV the upper exclusion limit in \sigma is computed for
     limit__number_of_cs1_bins                                        = 20, # int, number of bins in cS1 based on which the spectrum PDF is computed for the likelihood function
     limit__number_of_cs2_bins                                        = 20, # int, number of bins in cS2 based on which the spectrum PDF is computed for the likelihood function
+    limit__cl                                                        = 0.9, # float between 0 and 1, confidence level for the sensitivity calculation
     # flags
     flag_verbose                                                     = [False, True, "high-level-only"][2],                              # flag indicating the output this function is printing onto the screen
     flag_load_er_and_nr_signatures_for_pdf_calculation               = [False, True][0],                                                 # flag indicating whether or not the ER and NR signature are loaded instead of being computed (mainly relevant for testing)
@@ -3190,6 +3193,9 @@ def calculate_wimp_parameter_exclusion_curve(
 
     # a priori calculations: initial definitions
     if flag_verbose : print(f"\tinitial definitions")
+    median_upper_limit_list = []
+    lower_upper_limit_list = []
+    upper_upper_limit_list = []
     spectrum_components_dict = {
         "cs1_bin_edges"                                     : [], # list of floats, cS1 bin edges of the binned observable space
         "cs2_bin_edges"                                     : [], # list of floats, cS2 bin edges of the binned observable space, note: will be descending in order
@@ -3599,11 +3605,13 @@ def calculate_wimp_parameter_exclusion_curve(
             nr_background_signature_list.append(nr_background_signature)
 
 
-        # calculating the maximum likelihood parameter estimators
+        # calculating the upper limits
         if flag_verbose : print(f"\tcalculating the maximum likelihood parameter estimators")
         mle_sigma_list = []
         mle_thetavec_list = []
+        upper_limit_list = []
         for l in range(simulation__number_of_upper_limit_simulations_per_wimp_mass):
+
             # a priori definitions and calculations
             if flag_verbose : print(f"\t\ta priori calculations")
             er_data = er_background_signature_list[l]
@@ -3639,29 +3647,29 @@ def calculate_wimp_parameter_exclusion_curve(
                 n_obs_er.append(n_obs_er_row_list)
                 n_obs_nr.append(n_obs_nr_row_list)
 
-#            # defining the likelihood function
-#            def neg_likelihood_function(
-#                i_sigma, # SI WIMP-nucleon cross-section, Note: due to computational reasons 'lambda_wimps' was defined to correspond to a sigma of 1e-45 --> one needs to correcto for that factor later
-#                i_theta_er,
-#                i_theta_nr,
-#            ):
-#                # initial definitions
-#                lf_val = np.array(1)
-#                sigma = np.array(i_sigma)
-#                theta_er = np.array(i_theta_er)
-#                theta_nr = np.array(i_theta_nr)
-#                # Poisson factor product: looping over all bins of the cS1-cS2 observable space
-#                for b_row, be_row in enumerate(bin_edges_s2[:-1]):
-#                    for b_column, be_column in enumerate(bin_edges_s1[:-1]):
-#                        n_obs_b = n_obs_er[b_row][b_column] +n_obs_nr[b_row][b_column]
-#                        lambda_b = pdf_er[b_row][b_column]*lambda_er*theta_er +pdf_nr[b_row][b_column]*lambda_nr*theta_nr +pdf_wimps[b_row][b_column]*lambda_wimps*sigma
-#                        lf_val = lf_val *(lambda_b**n_obs_b *np.exp(-lambda_b)) # neglecting the expression 'n_obs_b!' since those don't depend on the parameters but are extremely expensive to compute
-#                # Gaussian factor product: looping over the nuissance parameter PDFS
-#                lf_val = lf_val *(1/(theta_er_sigma*np.sqrt(2*math.pi)) *np.exp(-0.5*((theta_er-1)/theta_er_sigma)**2))
-#                lf_val = lf_val *(1/(theta_nr_sigma*np.sqrt(2*math.pi)) *np.exp(-0.5*((theta_nr-1)/theta_nr_sigma)**2))
-#                return np.float64(-1)*lf_val
-
             # defining the likelihood function
+            def likelihood_function(
+                i_sigma, # SI WIMP-nucleon cross-section, Note: due to computational reasons 'lambda_wimps' was defined to correspond to a sigma of 1e-45 --> one needs to correcto for that factor later
+                i_theta_er,
+                i_theta_nr,
+            ):
+                # initial definitions
+                lf_val = np.array(1)
+                sigma = np.array(i_sigma)
+                theta_er = np.array(i_theta_er)
+                theta_nr = np.array(i_theta_nr)
+                # Poisson factor product: looping over all bins of the cS1-cS2 observable space
+                for b_row, be_row in enumerate(bin_edges_s2[:-1]):
+                    for b_column, be_column in enumerate(bin_edges_s1[:-1]):
+                        n_obs_b = n_obs_er[b_row][b_column] +n_obs_nr[b_row][b_column]
+                        lambda_b = pdf_er[b_row][b_column]*lambda_er*theta_er +pdf_nr[b_row][b_column]*lambda_nr*theta_nr +pdf_wimps[b_row][b_column]*lambda_wimps*sigma
+                        lf_val = lf_val *(lambda_b**n_obs_b *np.exp(-lambda_b)) # neglecting the expression 'n_obs_b!' since those don't depend on the parameters but are extremely expensive to compute
+                # Gaussian factor product: looping over the nuissance parameter PDFS
+                lf_val = lf_val *(1/(theta_er_sigma*np.sqrt(2*math.pi)) *np.exp(-0.5*((theta_er-1)/theta_er_sigma)**2))
+                lf_val = lf_val *(1/(theta_nr_sigma*np.sqrt(2*math.pi)) *np.exp(-0.5*((theta_nr-1)/theta_nr_sigma)**2))
+                return lf_val
+
+            # defining the negative log likelihood function
             if flag_verbose : print(f"\t\tdefining the 'log_likelihood_function'")
             def neg_log_likelihood_function(
                 i_sigma, # SI WIMP-nucleon cross-section, Note: due to computational reasons 'lambda_wimps' was defined to correspond to a sigma of 1e-45 --> one needs to correcto for that factor later
@@ -3711,26 +3719,53 @@ def calculate_wimp_parameter_exclusion_curve(
                 fun = lambda x : neg_log_likelihood_function(x[0],x[1],x[2]),
                 x0   = [0.01,0.9,0.91],
                 bounds = [[0,10000], [0.00001,5], [0.00001,5]],
-                method = None,
-            )
+                method = None,)
 
             mle_sigma = mle.x[0]
             mle_thetavec = [mle.x[1],mle.x[2]]
             mle_sigma_list.append(mle_sigma)
             mle_thetavec_list.append(mle_thetavec)
+
+            # defining the test statistic
+            def test_statistic(sigma):
+                if sigma < mle_sigma:
+                    return 0
+                else:
+                    hathat = minimize(
+                        fun = lambda x : neg_log_likelihood_function(mle_sigma,x[0],x[0]),
+                        x0   = [0.9,0.91],
+                        bounds = [[0.00001,5000], [0.00001,5000]],
+                        method = None,)
+                    theta_er_hathat = hathat.x[0]
+                    theta_nr_hathat = hathat.x[1]
+                    profile_likelihood_ratio = likelihood_function(sigma, theta_er_hathat, theta_nr_hathat)/likelihood_function(mle_sigma, mle_thetavec[0], mle_thetavec[1])
+                    return -2*np.log(profile_likelihood_ratio)
+
+            # determining the upper limit
+            q_threshold = chi2.ppf(1-(0.5*(1-limit__cl)),1) # see thesis
+            upper_limit = root_scalar(
+                f = lambda x : test_statistic(x) -q_threshold,
+                method = None,
+                x0 = 4.2,
+                x1 = 5.2,
+            )
+            upper_limit_list.append(upper_limit)
+
+            
+
+ 
         if flag_verbose : print(f"\t\tmaximum likelihood estimators")
         if flag_verbose : print(f"\t\tsigmas: {mle_sigma_list}")
         if flag_verbose : print(f"\t\tthetas: {mle_thetavec_list}")
 
-#        # calculating the upper limit for each of the 'simulation__number_of_upper_limit_simulations_per_wimp_mass'-many background-only datasets
-#        upper_limit_list = []
-#        for l in range(simulation__number_of_upper_limit_simulations_per_wimp_mass):
-#            if flag_verbose : print(f"\tstarting upper limit loop with l={l}/{simulation__number_of_upper_limit_simulations_per_wimp_mass}")
-
-
-            # determining the upper limit
-
         # determining the median upper limit along with the 1-sigma and 2-sigma bands
+        median, lower, upper = calculate_distribution_width_around_value(
+            distribution_data = upper_limit_list,
+            interval_width = 0.683,
+            flag_profile = ["asymmetric_around_median"][0],)
+        median_upper_limit_list.append(median)
+        lower_upper_limit_list.append(lower)
+        upper_upper_limit_list.append(upper)
 
     # compiling the output dictionary
     if flag_verbose : print(f"{fn}: filling the output dictionary")
@@ -3744,7 +3779,11 @@ def calculate_wimp_parameter_exclusion_curve(
 #            "limit_wimp_mass_gev_list" : limit_wimp_mass_gev_list,
 #            "flag_verbose" : flag_verbose,
 #        },
-#        "output" : {},
+        "output" : {
+            "median_upper_limit_list" : median_upper_limit_list,
+            "lower_upper_limit_list" : lower_upper_limit_list,
+            "upper_upper_limit_list" : upper_upper_limit_list,
+        },
         "spectrum_components" : spectrum_components_dict,
     }
 
