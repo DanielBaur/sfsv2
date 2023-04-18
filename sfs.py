@@ -22,9 +22,11 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import wimprates
 import os
+from random import uniform
 from random import randrange
 import time
 from datetime import timedelta
+import matplotlib.gridspec as gridspec
 
 
 
@@ -1217,7 +1219,7 @@ spectrum_dict_default_dict = {
         },
     },
     "nr_atm"		                            : {
-        "latex_label"                           : r"atm",
+        "latex_label"                           : r"atmospheric neutrinos",
         "color"                                 : color_atm_default,
         "linestyle"                             : "-",
         "linewidth"                             : 1,
@@ -1225,7 +1227,7 @@ spectrum_dict_default_dict = {
         "differential_rate_computation"         : "interpolation_from_file",
     },
     "nr_dsnb"		                            : {
-        "latex_label"                           : r"DSNB",
+        "latex_label"                           : r"DSNB neutrinos",
         "color"                                 : color_dsnb_default,
         "linestyle"                             : "-",
         "linewidth"                             : 1,
@@ -1233,7 +1235,7 @@ spectrum_dict_default_dict = {
         "differential_rate_computation"         : "interpolation_from_file",
     },
     "nr_b8"		                                : {
-        "latex_label"                           : r"$^{8}\mathrm{B}$",
+        "latex_label"                           : r"solar $^{8}\mathrm{B}$ neutrinos",
         "color"                                 : color_b8_default,
         "linestyle"                             : "-",
         "linewidth"                             : 1,
@@ -1241,16 +1243,24 @@ spectrum_dict_default_dict = {
         "differential_rate_computation"         : "interpolation_from_file",
     },
     "nr_hep"		                            : {
-        "latex_label"                           : r"hep",
+        "latex_label"                           : r"solar $hep$ neutrinos",
         "color"                                 : color_hep_default,
         "linestyle"                             : "-",
         "linewidth"                             : 1,
         "zorder"                                : 1,
         "differential_rate_computation"         : "interpolation_from_file",
     },
-    "nr_neutrons_baseline"                      : {
-        "latex_label"                           : r"radiogenic neutrons (baseline)",
-        "color"                                 : color_radiogenic_neutrons_default,
+    "nr_neutrons_new_baseline"                  : {
+        "latex_label"                           : r"radiogenic neutrons (achieved)",
+        "color"                                 : color_nrs_default,
+        "linestyle"                             : "--",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "mc_output",
+    },
+    "nr_neutrons_new_improved_ptfe_and_pmts_and_cryo"                  : {
+        "latex_label"                           : r"radiogenic neutrons (goal)",
+        "color"                                 : color_nrs_default,
         "linestyle"                             : "-",
         "linewidth"                             : 1,
         "zorder"                                : 1,
@@ -1288,6 +1298,14 @@ spectrum_dict_default_dict = {
         "zorder"                                : 1,
         "differential_rate_computation"         : "mc_output",
     },
+    "nr_neutrons_26t"                           : {
+        "latex_label"                           : r"radiogenic neutrons (goal)",
+        "color"                                 : color_nrs_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "mc_output",
+    },
     "nr_neutrons_20t"                           : {
         "latex_label"                           : r"radiogenic neutrons (20t FV)",
         "color"                                 : color_radiogenic_neutrons_default,
@@ -1297,7 +1315,7 @@ spectrum_dict_default_dict = {
         "differential_rate_computation"         : "mc_output",
     },
     "er_pp"		                                : {
-        "latex_label"                           : r"pp",
+        "latex_label"                           : r"solar $pp$ neutrinos",
         "color"                                 : color_pp_default,
         "linestyle"                             : "-",
         "linewidth"                             : 1,
@@ -1345,7 +1363,7 @@ spectrum_dict_default_dict = {
         "differential_rate_computation"         : "interpolation_from_file",
     },
     "er_nunubetabeta"	                        : {
-        "latex_label"                           : r"$\nu\nu\beta\beta$",
+        "latex_label"                           : r"$2\nu\beta\beta$ of $^{136}\mathrm{Xe}$",
         "color"                                 : color_nunubetabeta_default,
         "linestyle"                             : "-",
         "linewidth"                             : 1,
@@ -1356,7 +1374,15 @@ spectrum_dict_default_dict = {
         },
     },
     "er_rn222"                                  : { # assuming 0.1 uBq/kg
-        "latex_label"                           : r"naked $^{214}\mathrm{Pb}$ betas ($0.1\,\mathrm{\frac{\upmu Bq}{kg}}$ of $^{222}\mathrm{Rn}$)",
+        "latex_label"                           : r"naked $^{214}\mathrm{Pb}$ betas (goal: $0.1\,\mathrm{\frac{\upmu Bq}{kg}}$ of $^{222}\mathrm{Rn}$)",
+        "color"                                 : color_ers_default,
+        "linestyle"                             : "-",
+        "linewidth"                             : 1,
+        "zorder"                                : 1,
+        "differential_rate_computation"         : "mc_output",
+    },
+    "er_rn222_1ubqpkg"                          : { # assuming 1.0 uBq/kg, WARNING: in the .csv file I only manually multiplied the 0.1uBq/kg-rates times ten until 333.5keV
+        "latex_label"                           : r"naked $^{214}\mathrm{Pb}$ betas (achieved: $1.0\,\mathrm{\frac{\upmu Bq}{kg}}$ of $^{222}\mathrm{Rn}$)",
         "color"                                 : color_ers_default,
         "linestyle"                             : "--",
         "linewidth"                             : 1,
@@ -1369,7 +1395,7 @@ spectrum_dict_default_dict = {
 # adding combination profiles
 spectrum_dict_default_dict.update({
     "er_be7"		                            : {
-        "latex_label"                           : r"$^{7}\mathrm{Be}$",
+        "latex_label"                           : r"solar $^{7}\mathrm{Be}$ neutrinos",
         "color"                                 : color_be7_default,
         "linestyle"                             : "-",
         "linewidth"                             : 1,
@@ -1409,14 +1435,14 @@ spectrum_dict_default_dict.update({
         "latex_label"                           : r"combined NR background",
         "color"                                 : color_nrs_default,
         "linestyle"                             : "-",
-        "linewidth"                             : 2,
+        "linewidth"                             : 2.5,
         "zorder"                                : 2,
         "differential_rate_computation"         : "spectrum_sum",
-        "constituent_spectra_list"              : ["nr_atm", "nr_hep", "nr_b8", "nr_dsnb", "nr_neutrons_baseline"],
+        "constituent_spectra_list"              : ["nr_atm", "nr_hep", "nr_b8", "nr_dsnb", "nr_neutrons_new_improved_ptfe_and_pmts_and_cryo"],
     },
     # This is the combined ER background model used for the SFS study
     "combined_er_background"                    : {
-        "latex_label"                           : r"combined ER background",
+        "latex_label"                           : r"\textbf{combined ER background (goal)}",
         "color"                                 : color_ers_default,
         "linestyle"                             : "-",
         "linewidth"                             : 2,
@@ -1459,7 +1485,7 @@ def give_spectrum_dict(
     flag_verbose                            = False,
     flag_return_non_integer_events          = False,
     flag_inhibit_scaling                    = False,
-    flag_number_of_output_spectrum_dicts    = 1, # positive non-zero int, number of generated output dictionaries, only relevant if 'flag_spectrum_type'=='integral', if equals 1 a dictionary is returned, if greater than 1 a list of dictionaries is returned
+    flag_number_of_output_spectrum_dicts    = 1, # positive non-zero int, number of generated output dictionaries, only relevant if 'flag_spectrum_type'=='integral', if equals 1 a dictionary is returned, if greater than 1 a list of dictionaries is returned, this feature is used if many randomly-drawn populations are required, e.g., for simulations (then this function and the computation only needs to be called once)
     # keywords
     spectrum_dict_default_values            = spectrum_dict_default_dict, # default 'spectrum_dict' values
     differential_rate_parameters            = {} # additional keyword argument values overwriting those from 'spectrum_dict_default_values'
@@ -1533,7 +1559,7 @@ def give_spectrum_dict(
         })
         if callable(spectrum_dict["differential_rate_computation"]): # functions cannot be JSON-serialized
             spectrum_dict.pop("differential_rate_computation")
-
+        return spectrum_dict
 
     # case: returning integral 'spectrum_dict'
     elif flag_spectrum_type == "integral":
@@ -1542,11 +1568,14 @@ def give_spectrum_dict(
 
         # determining the expected number of events given the experiment's exposure
         if flag_verbose: print(f"\tdetermining the expected number of events given the experiment's exposure")
+        print(f"######################### starting integration #########################")
         expected_number_of_events_float_per_energy_bin = [exposure_t_y *integrate.quad(
             differential_spectrum_rate_events_t_y_kev,
             bc -0.5*binwidth_kev,
             bc +0.5*binwidth_kev,
+            limit = 250,
         )[0] for bc in recoil_energy_kev_list]
+        print(f"######################### finishing integration #########################")
         expected_number_of_events_float = np.sum(expected_number_of_events_float_per_energy_bin)
         expected_number_of_events_rounded = round(expected_number_of_events_float)
         expected_number_of_events_poisson = np.random.default_rng(seed=seed).poisson(expected_number_of_events_float, 1)[0]
@@ -1637,6 +1666,7 @@ def gen_spectrum_plot(
     flag_output_filename = "spectrum_plot.png",
     flag_shade_wimp_eroi = [],
     flag_verbose = False,
+    flag_profile = ["", "er_bkg_thesis_plot", "nr_bkg_thesis_plot"][0],
 ):
 
     """
@@ -1655,19 +1685,31 @@ def gen_spectrum_plot(
     fig = plt.figure(
         figsize = [plot_figure_size_x_inch, plot_figure_size_x_inch*plot_aspect_ratio],
         dpi = 150,
-        constrained_layout = True) 
+        constrained_layout = False) 
+    spec = gridspec.GridSpec(
+        ncols = 3,
+        nrows = 3,
+        figure = fig,
+        top = 0.995, # fixed
+        bottom = 0.005, # fixed
+        left = 0.005, # fixed
+        right = 0.995, # fixed
+        wspace = 0.0, # fixed
+        hspace = 0.0, # fixed
+        width_ratios = [0.115, 0.855, 0.030],
+        height_ratios = [0.020, 0.865, 0.115],)
 
     # axes
-    ax1 = fig.add_subplot()
+    ax1 = fig.add_subplot(spec[1,1])
     if plot_x_axis_units == "kev":
         ax1.set_xlabel(r"recoil energy, $E$ / $\mathrm{keV}$", fontsize=plot_fontsize_axis_label)
-        ax1.set_ylabel(r"differential event rate $\frac{\mathrm{d}R}{\mathrm{d}E}$ / $\mathrm{\frac{events}{t\times y\times keV}}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_ylabel(r"differential event rate, $\frac{\mathrm{d}R}{\mathrm{d}E}$ / $\mathrm{\frac{events}{t\times y\times keV}}$", fontsize=plot_fontsize_axis_label)
     elif plot_x_axis_units == "kev_nr":
-        ax1.set_xlabel(r"nuclear recoil energy, $E_{\mathrm{nr}}$ / $\mathrm{keV}_{\mathrm{nr}}$", fontsize=plot_fontsize_axis_label)
-        ax1.set_ylabel(r"differential event rate $\frac{\mathrm{d}R}{\mathrm{d}E_{\mathrm{nr}}}$ / $\mathrm{\frac{events}{t\times y\times keV}}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_xlabel(r"nuclear recoil energy, $E_{\mathrm{NR}}$ / $\mathrm{keV}_{\mathrm{NR}}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_ylabel(r"differential event rate, $\frac{\mathrm{d}R}{\mathrm{d}E_{\mathrm{NR}}}$ / $\mathrm{\frac{events}{t\times y\times keV_{NR}}}$", fontsize=plot_fontsize_axis_label)
     elif plot_x_axis_units == "kev_ee":
-        ax1.set_xlabel(r"electronic recoil energy, $E_{\mathrm{ee}}$ / $\mathrm{keV}_{\mathrm{ee}}$", fontsize=plot_fontsize_axis_label)
-        ax1.set_ylabel(r"differential event rate, $\frac{\mathrm{d}R}{\mathrm{d}E_{\mathrm{ee}}}$ / $\mathrm{\frac{events}{t\times y\times keV}}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_xlabel(r"electronic recoil energy, $E_{\mathrm{ER}}$ / $\mathrm{keV}_{\mathrm{ER}}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_ylabel(r"differential event rate, $\frac{\mathrm{d}R}{\mathrm{d}E_{\mathrm{ER}}}$ / $\mathrm{\frac{events}{t\times y\times keV_{ER}}}$", fontsize=plot_fontsize_axis_label)
     elif mode=="spectrum_dict":
         ax1.set_ylabel(r"events per energy bin", fontsize=plot_fontsize_axis_label)
     if plot_xlim != []: ax1.set_xlim(plot_xlim)
@@ -1675,12 +1717,80 @@ def gen_spectrum_plot(
     if plot_log_y_axis: ax1.set_yscale('log')
     if plot_log_x_axis: ax1.set_xscale('log')
 
+    # adapting plot for specific plots
+    if flag_profile == "er_bkg_thesis_plot":
+        print("so far so gut")
+        # annotating lines instead of legend
+        default_color = "#2e2e2e" # grey
+        default_color = "#454545" # grey
+        er_bkg_annotations = {
+            "er_pp"                     : [default_color,                                                   [0.99, 0.47],   ["right", "center"],    0],
+            "er_be7"                    : [default_color,                                                   [0.99, 0.15],   ["right", "center"],    0],
+            "er_nunubetabeta"           : [default_color,                                                   [0.46, 0.36],   ["center", "center"],  22],
+            "combined_er_background"    : [spectrum_dict_default_dict["combined_er_background"]["color"],   [0.97, 0.68],   ["right", "center"],  13],
+            "er_rn222"                  : [spectrum_dict_default_dict["er_rn222"]["color"],                 [0.99, 0.28],   ["right", "center"],    0],
+            "er_rn222_1ubqpkg"          : [spectrum_dict_default_dict["er_rn222_1ubqpkg"]["color"],         [0.01, 0.61],   ["left", "center"],     0],
+        }
+        for spectrum in spectra_list:
+            ax1.text(
+                x = er_bkg_annotations[spectrum][1][0],
+                y = er_bkg_annotations[spectrum][1][1],
+                s = spectrum_dict_default_dict[spectrum]["latex_label"],
+                fontsize = 8,
+                zorder = 21,
+                rotation = er_bkg_annotations[spectrum][3],
+                transform = ax1.transAxes,
+                horizontalalignment = er_bkg_annotations[spectrum][2][0],
+                verticalalignment = er_bkg_annotations[spectrum][2][1],
+                color = er_bkg_annotations[spectrum][0], )
+        ax1.text(
+            x = 0.50,
+            y = 0.98,
+            s = r"WIMP EROI",
+            fontsize = 7,
+            zorder = 21,
+            rotation = 0,
+            transform = ax1.transAxes,
+            horizontalalignment = "right",
+            verticalalignment = "top",
+            color = "#454545", )
+
+    elif flag_profile == "nr_bkg_thesis_plot":
+        print("so far so gut")
+        # annotating lines instead of legend
+        default_color = "#2e2e2e" # grey
+        default_color = "#454545" # grey
+        annotations = {
+            "nr_atm"                                            : [default_color,        [0.01, 0.56],   ["left", "center"],    -4,    7,   r"atmospheric neutrinos"],
+            "combined_nr_background"                            : [color_nrs_default,    [0.44, 0.53],   ["center", "center"],  -12,   7,   r"\textbf{combined NR background (goal)}"],
+            "nr_neutrons_new_baseline"                          : [color_nrs_default,    [0.50, 0.33],   ["center", "center"],  -16,   7,   r"\textbf{radiogenic neutrons (achieved)}"],
+            "nr_neutrons_new_improved_ptfe_and_pmts_and_cryo"   : [color_nrs_default,    [0.50, 0.19],   ["center", "center"],  -16,   7,   r"\textbf{radiogenic neutrons (goal)}"],
+            "nr_dsnb"                                           : [default_color,        [0.54, 0.01],   ["right", "bottom"],   -36,   7,   r"DSNB neutrinos"],
+            "nr_hep"                                            : [default_color,        [0.28, 0.01],   ["right", "bottom"],   -83,   7,   r"solar $hep$ neutrinos"],
+            "nr_b8"                                             : [default_color,        [0.20, 0.01],   ["right", "bottom"],   -86,   7,   r"solar $^{8}\mathrm{B}$ neutrinos"],
+            "wimps"                                             : [color_wimps_default,  [0.40, 0.74],   ["center", "center"],  -15,   7,   r"WIMPs"],
+            "wimps2"                                            : [color_wimps_default,  [0.39, 0.67],   ["center", "center"],  -15,   6,   r"($40\,\frac{\mathrm{GeV}}{c^2}$, $10^{-48}\,\mathrm{cm^2}$)"],
+            "wimpseroi"                                         : [default_color,        [0.76, 0.98],   ["right", "top"],        0,  10,   r"WIMP EROI"],
+        }
+        for ann in [*annotations]:
+            ax1.text(
+                x = annotations[ann][1][0],
+                y = annotations[ann][1][1],
+                s = annotations[ann][5],
+                fontsize = 7,
+                zorder = 21,
+                rotation = annotations[ann][3],
+                transform = ax1.transAxes,
+                horizontalalignment = annotations[ann][2][0],
+                verticalalignment = annotations[ann][2][1],
+                color = annotations[ann][0], )
+
     # looping over all specified spectra
     for spectrum in spectra_list:
 
         # case: generating differential spectrum only from specified string
         if type(spectrum) == str:
-            x_data_size = 4801
+            x_data_size = 6601
             if plot_log_x_axis:
                 if plot_xlim==[]:
                     x_data_recoil_energy_kev = np.logspace(start=-2, stop=+2, num=x_data_size, endpoint=True)
@@ -1688,6 +1798,7 @@ def gen_spectrum_plot(
                     exp_lower = int(list(f"{plot_xlim[0]:.2E}".split("E"))[-1])-1
                     exp_upper = int(list(f"{plot_xlim[1]:.2E}".split("E"))[-1])+1
                     x_data_recoil_energy_kev = np.logspace(start=exp_lower, stop=exp_upper, num=x_data_size, endpoint=True)
+                    x_data_recoil_energy_kev = np.geomspace(start=plot_xlim[0], stop=plot_xlim[1], num=x_data_size, endpoint=True)
             else:
                 if plot_xlim==[]:
                     x_data_recoil_energy_kev = np.linspace(start=0.01, stop=100.01, num=x_data_size, endpoint=True)
@@ -1697,7 +1808,8 @@ def gen_spectrum_plot(
                 spectrum_name = spectrum,
                 recoil_energy_kev_list = x_data_recoil_energy_kev,
                 abspath_spectra_files = abspath_spectra_files,
-                differential_rate_parameters = differential_rate_parameters)
+                differential_rate_parameters = differential_rate_parameters,
+                flag_verbose = flag_verbose,)
             plot_x_data = spectrum_dict["recoil_energy_kev_list"]
             plot_y_data = spectrum_dict["differential_recoil_rate_events_t_y_kev"]
 
@@ -1731,6 +1843,14 @@ def gen_spectrum_plot(
                         color = spectrum_dict["color"],)
 
         # plotting the current spectrum
+        if flag_profile == "er_bkg_thesis_plot":
+            overwrite_color = default_color
+            if spectrum in ["combined_er_background", "er_rn222", "er_rn222_1ubqpkg"]:
+                overwrite_color = spectrum_dict["color"]
+        elif flag_profile == "nr_bkg_thesis_plot":
+            overwrite_color = default_color
+            if spectrum in ["combined_nr_background", "nr_neutrons_new_baseline", "nr_neutrons_new_improved_ptfe_and_pmts_and_cryo", "nr_wimps_wimprates"]:
+                overwrite_color = spectrum_dict["color"]
         ax1.plot(
             plot_x_data,
             plot_y_data,
@@ -1738,7 +1858,7 @@ def gen_spectrum_plot(
             linestyle = spectrum_dict["linestyle"],
             linewidth = spectrum_dict["linewidth"],
             zorder = spectrum_dict["zorder"],
-            color = spectrum_dict["color"],)
+            color = spectrum_dict["color"] if flag_profile == "" else overwrite_color,)
 
     # shading the WIMP EROI
     if flag_shade_wimp_eroi != []:
@@ -3140,9 +3260,13 @@ def calculate_wimp_parameter_exclusion_curve(
     limit__number_of_cs1_bins                                        = 20, # int, number of bins in cS1 based on which the spectrum PDF is computed for the likelihood function
     limit__number_of_cs2_bins                                        = 20, # int, number of bins in cS2 based on which the spectrum PDF is computed for the likelihood function
     limit__cl                                                        = 0.9, # float between 0 and 1, confidence level for the sensitivity calculation
+    limit__sigma_ref_val_cm2                                         = 10**(-45), # float, WIMP-nucleon cross-section for which the expectation value of events is computed (and later corrected for), reccommended for computational reasons
     # flags
     flag_verbose                                                     = [False, True, "high-level-only"][2],                              # flag indicating the output this function is printing onto the screen
     flag_load_er_and_nr_signatures_for_pdf_calculation               = [False, True][0],                                                 # flag indicating whether or not the ER and NR signature are loaded instead of being computed (mainly relevant for testing)
+    flag_plot_test_statistics                                        = [False, True, 0.1][2],                                            # flag indicating whether of not the test statistics are printed for a range of sigmas, a float between 0 and 1 indicates the probability of a specific statistic to be printed
+    flag_plot_upper_limit_distribution                               = [False, True, 0.1][1],                                            # 
+    flag_plot_upper_limit_root_finding                               = [False, True, 0.1][2],                                            # 
     flag_plot_pdfs                                                   = [False, True, "er_nr_only"][2],                                   # flag indicating whether or not the inferred pdfs are being plotted
 ):
 
@@ -3178,9 +3302,9 @@ def calculate_wimp_parameter_exclusion_curve(
             abspathfile_new_detector_hh = abspath_nest_installation_nest_include_detectors +detector__detector_name +".hh",
             flag_clean_reinstall = True,
             flag_verbose = flag_verbose_low_level)
-    ct = time.time()-start_time
-    ctd = timedelta(seconds=ct)
-    if flag_verbose : print(f"\t\tfinished within {ctd} h'")
+    ctd = time.time()-start_time
+    ct = time.time()
+    print(f"\t\tfinished within {timedelta(seconds=ctd)} h'")
 
 
     # a priori calculations
@@ -3196,6 +3320,8 @@ def calculate_wimp_parameter_exclusion_curve(
     median_upper_limit_list = []
     lower_upper_limit_list = []
     upper_upper_limit_list = []
+    mean_upper_limit_list = []
+    standard_deviation_upper_limit_list = []
     spectrum_components_dict = {
         "cs1_bin_edges"                                     : [], # list of floats, cS1 bin edges of the binned observable space
         "cs2_bin_edges"                                     : [], # list of floats, cS2 bin edges of the binned observable space, note: will be descending in order
@@ -3291,9 +3417,9 @@ def calculate_wimp_parameter_exclusion_curve(
         spectrum_components_dict.update({
             "cs1_bin_edges" : spectral_pdf_bin_edges_cs1,
             "cs2_bin_edges" : spectral_pdf_bin_edges_cs2,}) # note, that the cS2 bins start with the highest bin edge first
-        ct = time.time()-ct
-        ctd = timedelta(seconds=ct)
-        if flag_verbose : print(f"\t\tfinished within {ctd} h'")
+        ctd = time.time()-ct
+        ct = time.time()
+        print(f"\t\tfinished within {timedelta(seconds=ctd)} h'")
 
 
     # a priori calculations: spectral PDFs for ER and NR background
@@ -3350,9 +3476,9 @@ def calculate_wimp_parameter_exclusion_curve(
                 ax1.set_xlabel(r"$cS_1$ / $\mathrm{phd}$", fontsize=11)
                 ax1.set_ylabel(r"$cS_2$ / $\mathrm{phd}$", fontsize=11)
                 plt.show()
-        ct = time.time()-ct
-        ctd = timedelta(seconds=ct)
-        if flag_verbose : print(f"\t\tfinished within {ctd} h'")
+        ctd = time.time()-ct
+        ct = time.time()
+        print(f"\t\tfinished within {timedelta(seconds=ctd)} h'")
 
 
     # a priori calculations: ER and NR expectation values
@@ -3396,9 +3522,9 @@ def calculate_wimp_parameter_exclusion_curve(
         spectrum_components_dict["er_background"]["number_of_expected_events_within_eroi"] = number_of_expected_er_background_events_within_wimp_eroi
         spectrum_components_dict["nr_background"]["number_of_expected_events_within_eroi"] = number_of_expected_nr_background_events_within_wimp_eroi
         # finishing
-        ct = time.time()-ct
-        ctd = timedelta(seconds=ct)
-        if flag_verbose : print(f"\t\tfinished within {ctd} h'")
+        ctd = time.time()-ct
+        ct = time.time()
+        print(f"\t\tfinished within {timedelta(seconds=ctd)} h'")
 
 
     # looping over the specified WIMP masses
@@ -3433,7 +3559,7 @@ def calculate_wimp_parameter_exclusion_curve(
                 spectrum_dict_default_values   = spectrum__default_spectrum_profiles,
                 differential_rate_parameters   = {
                     "mw"                       : wimp_mass_gev, # GeV
-                    "sigma_nucleon"            : 1e-45, # cm^2
+                    "sigma_nucleon"            : limit__sigma_ref_val_cm2, # cm^2
                 })
             # generating the high-statistics WIMP signature
             if flag_verbose : print(f"\t\tgenerating the high-statistics WIMP signature by executing NEST")
@@ -3493,9 +3619,9 @@ def calculate_wimp_parameter_exclusion_curve(
                 ax1.set_ylabel(r"$cS_2$ / $\mathrm{phd}$", fontsize=11)
                 plt.show()
             # finishing this substep
-            ct = time.time()-ct
-            ctd = timedelta(seconds=ct)
-            if flag_verbose : print(f"\t\tfinished within {ctd} h'")
+            ctd = time.time()-ct
+            ct = time.time()
+            print(f"\t\tfinished within {timedelta(seconds=ctd)} h'")
 
 
         # calculating the expected number of WIMP events within the binned observable space
@@ -3503,7 +3629,7 @@ def calculate_wimp_parameter_exclusion_curve(
         """
         Note, that the WIMP PDF does not depend on the spin-independent WIMP-nucleon cross-section.
         Instead, the expectation value depends on both the spin-independent WIMP-nucleon cross-section and the WIMP mass.
-        For every WIMP mass we calculate the expectation value corresponding to a 10**(-45) cm^2 WIMP.
+        For every WIMP mass we calculate the expectation value corresponding to a 'limit__sigma_ref_val_cm2' cm^2 WIMP.
         Since the expectation value depends linearly on the cross-section we will just scale this value accordingly.
         """
         if [False,True][1]:
@@ -3520,7 +3646,7 @@ def calculate_wimp_parameter_exclusion_curve(
                 spectrum_dict_default_values    = spectrum__default_spectrum_profiles,
                 differential_rate_parameters    = {
                     "mw"                       : wimp_mass_gev, # GeV
-                    "sigma_nucleon"            : 1e-45, # cm^2
+                    "sigma_nucleon"            : limit__sigma_ref_val_cm2, # cm^2
                 },
                 number_of_simulated_signatures  = simulation__number_of_samples_for_expectation_value_computation,
                 selection_window_recoil_energy  = limit__er_eroi_kev,
@@ -3531,9 +3657,9 @@ def calculate_wimp_parameter_exclusion_curve(
             if flag_verbose : print(f"\t\tupdating the 'spectrum_components_dict'")
             spectrum_components_dict["wimps"]["number_of_expected_events_within_eroi"] = number_of_expected_wimp_events_within_wimp_eroi
             # finishing
-            ct = time.time()-ct
-            ctd = timedelta(seconds=ct)
-            if flag_verbose : print(f"\t\tfinished within {ctd} h'")
+            ctd = time.time()-ct
+            ct = time.time()
+            print(f"\t\tfinished within {timedelta(seconds=ctd)} h'")
 
 
         # simulating 'simulation__number_of_upper_limit_simulations_per_wimp_mass'-many background-only datasets
@@ -3613,7 +3739,7 @@ def calculate_wimp_parameter_exclusion_curve(
         for l in range(simulation__number_of_upper_limit_simulations_per_wimp_mass):
 
             # a priori definitions and calculations
-            if flag_verbose : print(f"\t\ta priori calculations")
+            if flag_verbose : print(f"\n\t\ta priori calculations")
             er_data = er_background_signature_list[l]
             nr_data = nr_background_signature_list[l]
             bin_edges_s2 = spectrum_components_dict["cs2_bin_edges"]
@@ -3649,40 +3775,17 @@ def calculate_wimp_parameter_exclusion_curve(
 
             # defining the likelihood function
             def likelihood_function(
-                i_sigma, # SI WIMP-nucleon cross-section, Note: due to computational reasons 'lambda_wimps' was defined to correspond to a sigma of 1e-45 --> one needs to correcto for that factor later
+                i_sigma, # SI WIMP-nucleon cross-section, Note: due to computational reasons 'lambda_wimps' was defined to correspond to a sigma of 'limit__sigma_ref_val_cm2' --> one needs to correcto for that factor later
                 i_theta_er,
                 i_theta_nr,
             ):
                 # initial definitions
-                lf_val = np.array(1)
-                sigma = np.array(i_sigma)
-                theta_er = np.array(i_theta_er)
-                theta_nr = np.array(i_theta_nr)
+                lf_val = np.float128(1)
+                sigma = np.float128(i_sigma)
+                theta_er = np.float128(i_theta_er)
+                theta_nr = np.float128(i_theta_nr)
                 # Poisson factor product: looping over all bins of the cS1-cS2 observable space
-                for b_row, be_row in enumerate(bin_edges_s2[:-1]):
-                    for b_column, be_column in enumerate(bin_edges_s1[:-1]):
-                        n_obs_b = n_obs_er[b_row][b_column] +n_obs_nr[b_row][b_column]
-                        lambda_b = pdf_er[b_row][b_column]*lambda_er*theta_er +pdf_nr[b_row][b_column]*lambda_nr*theta_nr +pdf_wimps[b_row][b_column]*lambda_wimps*sigma
-                        lf_val = lf_val *(lambda_b**n_obs_b *np.exp(-lambda_b)) # neglecting the expression 'n_obs_b!' since those don't depend on the parameters but are extremely expensive to compute
-                # Gaussian factor product: looping over the nuissance parameter PDFS
-                lf_val = lf_val *(1/(theta_er_sigma*np.sqrt(2*math.pi)) *np.exp(-0.5*((theta_er-1)/theta_er_sigma)**2))
-                lf_val = lf_val *(1/(theta_nr_sigma*np.sqrt(2*math.pi)) *np.exp(-0.5*((theta_nr-1)/theta_nr_sigma)**2))
-                return lf_val
-
-            # defining the negative log likelihood function
-            if flag_verbose : print(f"\t\tdefining the 'log_likelihood_function'")
-            def neg_log_likelihood_function(
-                i_sigma, # SI WIMP-nucleon cross-section, Note: due to computational reasons 'lambda_wimps' was defined to correspond to a sigma of 1e-45 --> one needs to correcto for that factor later
-                i_theta_er,
-                i_theta_nr,
-            ):
-                # initial definitions
-                llf_val = np.array(0)
-                sigma = np.array(i_sigma)
-                theta_er = np.array(i_theta_er)
-                theta_nr = np.array(i_theta_nr)
-                
-                # Poisson factor product: looping over all bins of the cS1-cS2 observable space
+                ctr = 0
                 for b_row, be_row in enumerate(bin_edges_s2[:-1]):
                     for b_column, be_column in enumerate(bin_edges_s1[:-1]):
                         n_obs_b = n_obs_er[b_row][b_column] +n_obs_nr[b_row][b_column]
@@ -3692,6 +3795,52 @@ def calculate_wimp_parameter_exclusion_curve(
                         elif lambda_b < 0:
                             raise Exception(f"'lambda_b'<0")
                         else:
+#                            if lambda_b in [np.inf, 0.0, 1.0]:
+#                                print(f"lambda_b: 'lambda_b'={lambda_b}=")
+#                                print(f"\t\t{pdf_er[b_row][b_column]}*{lambda_er}*{theta_er} (ER)")
+#                                print(f"\t\t{pdf_nr[b_row][b_column]}*{lambda_nr}*{theta_nr} (NR)")
+#                                print(f"\t\t{pdf_wimps[b_row][b_column]}*{lambda_wimps}*{sigma} (NR)")
+                            fac1 = np.float128(lambda_b)**np.float128(n_obs_b)
+#                            if fac1 in [np.inf, 0.0]:
+#                                print(f"fac1: 'fac1'={fac1}={np.float128(lambda_b)}**{np.float128(n_obs_b)}")
+                            fac2 = np.float128(np.exp(np.float128(-lambda_b)))
+#                            if fac2 in [np.inf, 0.0, 1.0]:
+#                                print(f"fac2: '-lambda_b'={-lambda_b}")
+                            fac3 = 1/np.float128(math.factorial(n_obs_b))
+#                            if fac3 in [np.inf, 0.0]:
+#                                print(f"fac3: 'n_obs_b'={n_obs_b}")
+                            lf_val_modfac = fac1 *fac2 *fac3 # neglecting the expression 'n_obs_b!' since those don't depend on the parameters but are extremely expensive to compute
+                            lf_val = lf_val *lf_val_modfac
+#                            print(f"{ctr}: 'modfac'={fac1}*{fac2}*{fac3}={lf_val_modfac} ---> {lf_val}\n")
+                            ctr += 1
+                # Gaussian factor product: looping over the nuissance parameter PDFS
+                lf_val = np.float128(lf_val) *(1/np.float128((theta_er_sigma*np.sqrt(2*math.pi))) *np.exp(np.float128(-0.5*((theta_er-1)/theta_er_sigma)**2)))
+                lf_val = np.float128(lf_val) *(1/np.float128((theta_nr_sigma*np.sqrt(2*math.pi))) *np.exp(np.float128(-0.5*((theta_nr-1)/theta_nr_sigma)**2)))
+                return lf_val
+
+            # defining the negative log likelihood function
+            if flag_verbose : print(f"\t\tdefining the 'log_likelihood_function'")
+            def neg_log_likelihood_function(
+                i_sigma, # SI WIMP-nucleon cross-section, Note: due to computational reasons 'lambda_wimps' was defined to correspond to a sigma of 'limit__sigma_ref_val_cm2' --> one needs to correct for that factor later
+                i_theta_er,
+                i_theta_nr,
+            ):
+                # initial definitions
+                llf_val = np.array(0)
+                sigma = np.absolute(np.float128(i_sigma))
+                theta_er = np.absolute(np.float128(i_theta_er))
+                theta_nr = np.absolute(np.float128(i_theta_nr))
+                
+                # Poisson factor product: looping over all bins of the cS1-cS2 observable space
+                for b_row, be_row in enumerate(bin_edges_s2[:-1]):
+                    for b_column, be_column in enumerate(bin_edges_s1[:-1]):
+                        n_obs_b = n_obs_er[b_row][b_column] +n_obs_nr[b_row][b_column]
+                        lambda_b = pdf_er[b_row][b_column]*lambda_er*theta_er +pdf_nr[b_row][b_column]*lambda_nr*theta_nr +pdf_wimps[b_row][b_column]*lambda_wimps*sigma
+                        if lambda_b == 0:
+                            continue
+                        #elif lambda_b < 0:
+                        #    raise Exception(f"'lambda_b'<0")
+                        else:
                             llf_val = llf_val + n_obs_b*np.log(lambda_b) -lambda_b
                         llf_val = llf_val + n_obs_b*np.log(lambda_b) -lambda_b
                 # Gaussian factor product: looping over the nuissance parameter PDFS
@@ -3699,7 +3848,7 @@ def calculate_wimp_parameter_exclusion_curve(
                 llf_val = llf_val -np.log(theta_nr_sigma) -0.5*np.log(2*math.pi) -0.5*((theta_nr-1)/theta_nr_sigma)**2
                 return np.float64(-1)*llf_val
 
-#            print(f"######## start: test_likelihood_function output ########")
+#            print(f"######## start: test_likelihood_function output ########")	
 #            test_neg_log_likelihood_function(1,1,1)
 #            print(f"######## finish: test_likelihood_function output ########")
 #            raise Exception(f"HkIWs!")
@@ -3718,47 +3867,134 @@ def calculate_wimp_parameter_exclusion_curve(
             mle = minimize(
                 fun = lambda x : neg_log_likelihood_function(x[0],x[1],x[2]),
                 x0   = [0.01,0.9,0.91],
-                bounds = [[0,10000], [0.00001,5], [0.00001,5]],
-                method = None,)
+                #bounds = [[0,10000], [0.00001,5], [0.00001,5]],
+#                method = None,)
+                options = {
+                    "xtol" : 0.00000000000000000000000000001,
+                    "ftol" : 0.00000000000000000000000000001},
+                method = "Powell",)
 
-            mle_sigma = mle.x[0]
-            mle_thetavec = [mle.x[1],mle.x[2]]
+            mle_sigma = np.absolute(mle.x[0])
+            mle_thetavec = [np.absolute(mle.x[1]),np.absolute(mle.x[2])]
+            if flag_verbose : print(f"\t\t--->'mle_sigma': {mle_sigma}")
+            if flag_verbose : print(f"\t\t--->'mle_theta_er': {mle_thetavec[0]}")
+            if flag_verbose : print(f"\t\t--->'mle_theta_nr': {mle_thetavec[1]}")
             mle_sigma_list.append(mle_sigma)
             mle_thetavec_list.append(mle_thetavec)
+#            print(f"maximum likelihood estimation:")
+#            print(f"maximum likelihood parameter estimates: {mle_sigma}, {mle.x[1]}, {mle.x[2]}")
+#            print(f"maximum likelihood function: {likelihood_function(mle_sigma, mle.x[1], mle.x[2])}")
+#            raise Exception(f"STOP! Likelihood Time!")
 
             # defining the test statistic
+            if flag_verbose : print(f"\t\tdefining the test statistic")
             def test_statistic(sigma):
                 if sigma < mle_sigma:
+                    #print("\n")
+                    #print(f"'sigma'<'mle_sigma'")
+                    #print(sigma, mle_sigma)
                     return 0
                 else:
                     hathat = minimize(
-                        fun = lambda x : neg_log_likelihood_function(mle_sigma,x[0],x[0]),
+                        fun = lambda x : neg_log_likelihood_function(sigma,x[0],x[1]),
                         x0   = [0.9,0.91],
-                        bounds = [[0.00001,5000], [0.00001,5000]],
-                        method = None,)
-                    theta_er_hathat = hathat.x[0]
-                    theta_nr_hathat = hathat.x[1]
-                    profile_likelihood_ratio = likelihood_function(sigma, theta_er_hathat, theta_nr_hathat)/likelihood_function(mle_sigma, mle_thetavec[0], mle_thetavec[1])
-                    return -2*np.log(profile_likelihood_ratio)
+                        #bounds = [[0.00001,5000], [0.00001,5000]],
+#                        method = None,)
+                        options = {
+                            "xtol" : 0.00000000000000000000000000001,
+                            "ftol" : 0.00000000000000000000000000001},
+                        method = "Powell",)
+                    theta_er_hathat = np.absolute(hathat.x[0])
+                    theta_nr_hathat = np.absolute(hathat.x[1])
+#                    print(f"\ntheta hathat")
+#                    print(theta_er_hathat)
+#                    print(theta_nr_hathat)
+                    #numerator = np.float128(likelihood_function(sigma, theta_er_hathat, theta_nr_hathat))
+                    #denominator = np.float128(likelihood_function(mle_sigma, mle_thetavec[0], mle_thetavec[1]))
+                    #profile_likelihood_ratio = numerator/denominator
+                    #test_statistic = -2*np.log(profile_likelihood_ratio)
+
+                    test_statistic = -2*( -1 *neg_log_likelihood_function(sigma, theta_er_hathat, theta_nr_hathat) + neg_log_likelihood_function(mle_sigma, mle_thetavec[0], mle_thetavec[1]) ) 
+
+
+                    #print("\n")
+                    if test_statistic in [np.inf, 0.0]:
+                        print(f"'test_statistic' (for 'sigma'={sigma}, 'type(test_statistic)'={type(test_statistic)}):")
+                        print(test_statistic)
+                    return test_statistic
+
+            # plotting the test statistic
+            if flag_plot_test_statistics != False:
+                # deciding whether this specific test statistic is being plotted
+                if type(flag_plot_test_statistics) == float:
+                    if uniform(0,1) <= flag_plot_test_statistics:
+                        flag_really_plot_test_statiscs = True
+                    else:
+                        flag_really_plot_test_statiscs = False
+                elif flag_plot_test_statiscs == True:
+                    flag_really_plot_test_statiscs = True
+                # plotting
+                if flag_really_plot_test_statiscs == True:
+                    if flag_verbose : print(f"\t\ttest statistic plot")
+#                    x_data = np.geomspace(start=0.000003, stop=0.003, num=150, endpoint=True)
+                    x_data = np.geomspace(start=0.0002, stop=0.002, num=150, endpoint=True)
+                    x_data = np.linspace(start=0.0002, stop=0.0040, num=150, endpoint=True)
+                    y_data = [test_statistic(x) for x in x_data]
+#                    print(x_data)
+#                    print(y_data)
+                    plt.plot(x_data,y_data)
+#                    plt.xscale("log")
+                    plt.yscale("log")
+                    plt.axhline(chi2.ppf(1-(0.5*(1-limit__cl)),1), color="black")
+                    plt.show()
+                    #flag_valid = True
+                    #for s, y in enumerate(y_data):
+                    #    if y in [0.0, np.inf]:
+                    #        print(f"invalid test statistic value: {y}")
+                    #        if y in [np.inf] and x_data[s] < 10:
+                    #            flag_valid = False
+                    #if flag_valid == False : raise Exception(f"invalid test statistic value")
 
             # determining the upper limit
+            if flag_verbose : print(f"\t\tdetermining the upper limit")
             q_threshold = chi2.ppf(1-(0.5*(1-limit__cl)),1) # see thesis
             upper_limit = root_scalar(
                 f = lambda x : test_statistic(x) -q_threshold,
                 method = None,
-                x0 = 4.2,
-                x1 = 5.2,
+                bracket = [0,100],
+                rtol = 0.00000001,
+#                x0 = 0.01,
+#                x1 = 0.5,
             )
-            upper_limit_list.append(upper_limit)
+            upper_limit_list.append(upper_limit.root)
+            if flag_verbose : print(f"\t\t--->{upper_limit.root}")
+            # printing the upper limit root finding
+            if flag_plot_upper_limit_root_finding != False:
+                # deciding whether this specific test statistic is being plotted
+                if type(flag_plot_upper_limit_root_finding) == float:
+                    if uniform(0,1) <= flag_plot_upper_limit_root_finding:
+                        flag_really_plot_upper_limit_root_finding = True
+                    else:
+                        flag_really_plot_upper_limit_root_finding = False
+                elif flag_plot_upper_limit_root_finding == True:
+                    flag_really_plot_upper_limit_root_finding = True
+                # plotting
+                if flag_really_plot_upper_limit_root_finding == True:
+                    print(f"\t\t--->{upper_limit}")
+
+
+            #raise Exception(f"Hier könnte Ihre Werbung stehen.")
 
             
 
  
-        if flag_verbose : print(f"\t\tmaximum likelihood estimators")
-        if flag_verbose : print(f"\t\tsigmas: {mle_sigma_list}")
-        if flag_verbose : print(f"\t\tthetas: {mle_thetavec_list}")
+        #if flag_verbose : print(f"\t\tmaximum likelihood estimators")
+        #if flag_verbose : print(f"\t\tmle sigmas: {mle_sigma_list}")
+        #if flag_verbose : print(f"\t\tmle thetas: {mle_thetavec_list}")
 
-        # determining the median upper limit along with the 1-sigma and 2-sigma bands
+        # determining the median upper limit along with the 1-sigma band
+        if flag_verbose : print(f"\tdetermining the median upper limit ({len(upper_limit_list)} elements, different ones {len(set(upper_limit_list))})")
+        if flag_verbose : print(f"\t'upper_limit_list' = {upper_limit_list}")
         median, lower, upper = calculate_distribution_width_around_value(
             distribution_data = upper_limit_list,
             interval_width = 0.683,
@@ -3766,32 +4002,283 @@ def calculate_wimp_parameter_exclusion_curve(
         median_upper_limit_list.append(median)
         lower_upper_limit_list.append(lower)
         upper_upper_limit_list.append(upper)
+        mean = np.mean(upper_limit_list)
+        standard_deviation = np.std(upper_limit_list)
+        mean_upper_limit_list.append(mean)
+        standard_deviation_upper_limit_list.append(standard_deviation)
+
+        # plotting the upper limit distribution
+        if flag_plot_upper_limit_distribution != False:
+            # deciding whether this specific test statistic is being plotted
+            if type(flag_plot_upper_limit_distribution) == float:
+                if uniform(0,1) <= flag_plot_upper_limit_distribution:
+                    flag_really_plot_upper_limit_distribution = True
+                else:
+                    flag_really_plot_upper_limit_distribution = False
+            elif flag_plot_upper_limit_distribution == True:
+                flag_really_plot_upper_limit_distribution = True
+            # plotting
+            if flag_really_plot_upper_limit_distribution == True:
+                if flag_verbose : print(f"\t\tupper limit distribution plot (WIMP mass = {wimp_mass_gev:.2f} GeV)")
+                n, bins, patches = plt.hist(upper_limit_list, int(simulation__number_of_upper_limit_simulations_per_wimp_mass/3), facecolor='g', alpha=1.0)
+                plt.axvline(x=median, color="black", zorder=-1)
+                plt.gca().axvspan(xmin=lower, xmax=upper, color="cyan", alpha=0.5, zorder=-1)
+                #plt.xscale("log")
+                #plt.yscale("log")
+                plt.show()
+
+
 
     # compiling the output dictionary
     if flag_verbose : print(f"{fn}: filling the output dictionary")
     output_dict = {
-#        "input" : {
-#            "detector__drift_field_v_cm"   : detector__drift_field_v_cm,
-#            "spectrum__er_eroi_kev" : spectrum__er_eroi_kev,
-#            "spectrum__nr_eroi_kev" : spectrum__nr_eroi_kev,
-#            "spectrum__er_simulation_window_kev" : spectrum__er_simulation_window_kev,
-#            "spectrum__nr_simulation_window_kev" : spectrum__nr_simulation_window_kev,
-#            "limit_wimp_mass_gev_list" : limit_wimp_mass_gev_list,
-#            "flag_verbose" : flag_verbose,
-#        },
-        "output" : {
-            "median_upper_limit_list" : median_upper_limit_list,
-            "lower_upper_limit_list" : lower_upper_limit_list,
-            "upper_upper_limit_list" : upper_upper_limit_list,
+        "input" : {
+            # physical detector parameters
+            "detector__drift_field_v_cm"                                        : detector__drift_field_v_cm,
+            "detector__nest_parameter_dict"                                     : detector__nest_parameter_dict,
+            "detector__runtime_y"                                               : detector__runtime_y,
+            "detector__fiducial_mass_t"                                         : detector__fiducial_mass_t,
+            "detector__detector_name"                                           : detector__detector_name,
+            # physical spectrum parameters
+            #"spectrum__default_spectrum_profiles"                               : spectrum__default_spectrum_profiles,
+            "spectrum__resources"                                               : spectrum__resources,
+            "spectrum__er_background_model"                                     : spectrum__er_background_model,
+            "spectrum__nr_background_model"                                     : spectrum__nr_background_model,
+            "spectrum__wimp_model"                                              : spectrum__wimp_model,
+            # simulation setting
+            "simulation__er_spectrum_energy_simulation_window_kev"              : simulation__er_spectrum_energy_simulation_window_kev,
+            "simulation__nr_spectrum_energy_simulation_window_kev"              : simulation__nr_spectrum_energy_simulation_window_kev,
+            "simulation__number_of_spectrum_energy_bins"                        : simulation__number_of_spectrum_energy_bins,
+            "simulation__number_of_upper_limit_simulations_per_wimp_mass"       : simulation__number_of_upper_limit_simulations_per_wimp_mass,
+            "simulation__number_of_pdf_calculation_events"                      : simulation__number_of_pdf_calculation_events,
+            "simulation__number_of_samples_for_expectation_value_computation"   : simulation__number_of_samples_for_expectation_value_computation,
+            # limit calculation parameters
+            "limit__er_eroi_kev"                                                : limit__er_eroi_kev,
+            "limit__nr_eroi_kev"                                                : limit__nr_eroi_kev,
+            "limit__wimp_mass_gev_list"                                         : [float(f) for f in limit__wimp_mass_gev_list],
+            "limit__number_of_cs1_bins"                                         : limit__number_of_cs1_bins,
+            "limit__number_of_cs2_bins"                                         : limit__number_of_cs2_bins,
+            "limit__cl"                                                         : limit__cl,
+            # flags
+            "flag_verbose"                                                      : flag_verbose,
+            "flag_plot_pdfs"                                                    : flag_plot_pdfs,
+            "flag_load_er_and_nr_signatures_for_pdf_calculation"                : flag_load_er_and_nr_signatures_for_pdf_calculation,
         },
-        "spectrum_components" : spectrum_components_dict,
+        "output" : {
+            "median_upper_limit_list"                                           : [float(f) for f in median_upper_limit_list],
+            "lower_upper_limit_list"                                            : [float(f) for f in lower_upper_limit_list],
+            "upper_upper_limit_list"                                            : [float(f) for f in upper_upper_limit_list],
+            "mean_upper_limit_list"                                             : [float(f) for f in mean_upper_limit_list],
+            "standard_deviation_upper_limit_list"                               : [float(f) for f in standard_deviation_upper_limit_list],
+        },
+        "spectrum_components"                                                   : spectrum_components_dict,
     }
 
 
     # finishing
-    ctd = timedelta(seconds=time.time()-start_time)
-    if flag_verbose : print(f"{fn}: finished within {ctd} h")
+    ctd = time.time()-start_time
+    print(f"\t\tfinished within {timedelta(seconds=ctd)} h'")
     return output_dict
+
+
+
+
+def plot_sensitivity_curve_comparison(
+    # required parameters
+    sensitivity_curve_dict_list     = [],
+#    flag_comp_values                = [], # list of linearly or logarithmically-spaced floats, see docstring
+    flag_comp_values                = [],
+#    flag_comp_values                = np.linspace(start=2.3, stop=4.7, num=4, endpoint=True),
+    # comparison parameters
+    cbar_label                      = r"HkIWs",
+    cbar_cmap                       = "YlGnBu",
+    legend_colors                   = [], # list of color strings, colors with which the sensitivity curves are plotted (ignored if 'flag_comp_values' is given)
+    legend_labels                   = [], # list of latex strings, labels of the plotted sensitivity curves
+    # plotting parameters
+    plot_width_ratios               = [0.07, 0.79, 0.02, 0.03, 0.09], # list of five floats adding up to 1.0, width ratios of the subplot windows
+    plot_height_ratios              = [0.005, 0.875, 0.12], # list of five floats adding up to 1.0, height ratios of the subplot windows
+    plot_y_labelpad                 = 5.0, # float, labelpad of the y axis
+    plot_x_labelpad                 = 0.0, # float, labelpad of the x axis
+    plot_cbar_labelpad              = 6.0, # float, labelpad of the colorbar
+    plot_logxscale                  = False, # bool, indicating whether the x-axis is scaled logarithmically
+    plot_logyscale                  = False, # bool, indicating whether the y-axis is scaled logarithmically
+    plot_x_axlim                    = [10,1000], # list of two floats, x-axis limits in GeV, ignored if empty list
+    plot_y_axlim                    = [], # list of two floats, y-axis limits in cm^2, ignored if empty list
+    # other
+    output_abspath_list             = [], # list of abspathstrings, the generated plot is saved as and to all specified locations
+):
+
+    """
+    This function is used to plot a comparison of sensitivity curves.
+    Depending on wheter 'flag_comp_values' is an empty list or not this function operates either in 'cbar' or 'legend' mode.
+        - 'cbar' mode is used to display the sensitivity curves of a specific parameter scan (e.g. logarithmically spaced drift field values), every plotted sensitivity curve corresponds to one value of 'flag_comp_values' and is displayed with a colorbar
+        - 'legend' mode is used to display fundamentally different sensitivity curves; the respective specifications from 'comp_labels' are denoted in the legend
+    """
+
+    # mock up data
+    x_data = [1,2,3,4,5]
+    y_data_0 = [2,3,4,5,6]
+    y_data_1 = [3,4,5,6,7]
+    y_data_2 = [4,6,6,7,8]
+    y_data_3 = [5,7,7,8,9]
+#        "output" : {
+#            "median_upper_limit_list" : median_upper_limit_list,
+#            "lower_upper_limit_list" : lower_upper_limit_list,
+#            "upper_upper_limit_list" : upper_upper_limit_list,
+#        },
+#        "spectrum_components" : spectrum_components_dict,
+
+    sensitivity_curve_dict_list_mock_up = [
+        {
+            "input" : {
+                "limit__wimp_mass_gev_list" : x_data
+            },
+            "output" : {
+                "median_upper_limit_list"   : y_data_0,
+                "lower_upper_limit_list"    : [y-0.4 for y in y_data_0],
+                "upper_upper_limit_list"    : [y+0.4 for y in y_data_0],
+            },
+        },
+        {
+            "input" : {
+                "limit__wimp_mass_gev_list" : x_data
+            },
+            "output" : {
+                "median_upper_limit_list" : y_data_1,
+                "lower_upper_limit_list"    : [y-0.4 for y in y_data_1],
+                "upper_upper_limit_list"    : [y+0.4 for y in y_data_1],
+            },
+        },
+        {
+            "input" : {
+                "limit__wimp_mass_gev_list" : x_data
+            },
+            "output" : {
+                "median_upper_limit_list" : y_data_2,
+                "lower_upper_limit_list"    : [y-0.4 for y in y_data_2],
+                "upper_upper_limit_list"    : [y+0.4 for y in y_data_2],
+            },
+        },
+        {
+            "input" : {
+                "limit__wimp_mass_gev_list" : x_data
+            },
+            "output" : {
+                "median_upper_limit_list" : y_data_3,
+                "lower_upper_limit_list"    : [y-0.4 for y in y_data_3],
+                "upper_upper_limit_list"    : [y+0.4 for y in y_data_3],
+            },
+        },
+    ]
+
+    # initialization
+    if flag_comp_values != []:
+        mode = 'cbar'
+    else:
+        mode = 'legend'
+
+    # canvas
+    fig = plt.figure(
+        figsize = [5.670, 5.670*9/16],
+        constrained_layout = False,
+        dpi = 150)
+    if mode == 'cbar':
+        plot_width_ratios = plot_width_ratios
+        plot_height_ratios = plot_height_ratios
+    elif mode == 'legend':
+        plot_width_ratios = [plot_width_ratios[0], plot_width_ratios[1]+plot_width_ratios[2]+plot_width_ratios[3], plot_width_ratios[4]]
+        plot_height_ratios = plot_height_ratios
+    spec = gridspec.GridSpec(
+        ncols = 5 if mode=="cbar" else 3,
+        nrows = 3,
+        figure = fig,
+        top = 0.995,
+        bottom = 0.005,
+        left = 0.005,
+        right = 0.995,
+        wspace = 0.0,
+        hspace = 0.0,
+        width_ratios = plot_width_ratios,
+        height_ratios = plot_height_ratios,)
+
+    # axes
+    ax_plot = fig.add_subplot(spec[1, 1])
+    ax_plot.set_xlabel(r"WIMP mass, $m_{\chi}$ / $\mathrm{GeV}$", labelpad=plot_x_labelpad)
+    ax_plot.set_ylabel(r"SI WIMP-nucleon cross-section, $\sigma^{\mathrm{SI}}_{\chi,n}$ / $\mathrm{cm}^2$", labelpad=plot_y_labelpad)
+    if plot_logxscale : ax_plot.set_xscale('log')
+    if plot_logyscale : ax_plot.set_yscale('log')
+    if mode == 'cbar':
+        ax_cbar = fig.add_subplot(spec[1, 3])
+        ax_cbar.set_ylabel(cbar_label, labelpad=plot_cbar_labelpad)
+        ax_cbar.yaxis.set_label_position("right")
+        ax_cbar.yaxis.tick_right()
+        ax_cbar.set_xticks([])
+        ax_cbar.tick_params(left = False)
+        ax_cbar.set_yticks(flag_comp_values)
+        ax_cbar.tick_params(which="minor", length=0)
+    if plot_x_axlim != [] : ax_plot.set_xlim(plot_x_axlim)
+    if plot_y_axlim != [] : ax_plot.set_ylim(plot_y_axlim)
+
+    # colorbar
+    # Here I am pfushing up some custom color bar instead of following the standard plt procedure described in the threads below:
+    # https://matplotlib.org/stable/tutorials/colors/colorbar_only.html (accessed: 15th September 2022)
+    # https://www.geeksforgeeks.org/matplotlib-pyplot-colorbar-function-in-python/ (accessed: 15th September 2022)
+    if mode == 'cbar':
+        cmap = mpl.cm.get_cmap(cbar_cmap)
+        color_float_indices = list(np.linspace(start=0, stop=1, num=len(flag_comp_values), endpoint=True))
+        color_list = [mpl.colors.to_hex(cmap(color_float_index), keep_alpha=True) for color_float_index in color_float_indices]
+        if flag_comp_values[1]-flag_comp_values[0] == flag_comp_values[2]-flag_comp_values[1]: # linear
+            binwidth = flag_comp_values[1]-flag_comp_values[0]
+            color_bounds = [flag_comp_values[0]-0.5*binwidth] +[cv+0.5*binwidth for cv in flag_comp_values]
+        else: # logarithmic
+            ax_cbar.set_yscale('log')
+            ax_cbar.set_yticks(flag_comp_values) # NOTE: the display of the colorbar ticks in the logarithmic case does not work yet, implement later if needed
+            #ax_cbar.get_yaxis().get_major_formatter().labelOnlyBase = False
+            ax_cbar.get_yaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
+            ax_cbar.get_yaxis().set_minor_formatter(mpl.ticker.NullFormatter())
+#            ax_cbar.get_yaxis().set_tick_params(which='major', size=0)
+#            ax_cbar.get_yaxis().set_tick_params(which='major', width=0) 
+
+            color_bounds = list(np.geomspace(start=flag_comp_values[0], stop=flag_comp_values[-1], num=2*len(flag_comp_values)-1, endpoint=True))
+            color_bounds = [color_bounds[0]/(color_bounds[1]/color_bounds[0])] +color_bounds +[color_bounds[-1]*(color_bounds[1]/color_bounds[0])]
+            color_bounds = color_bounds[::2]
+        ax_cbar.set_xlim([0,1])
+        ax_cbar.set_ylim([color_bounds[0],color_bounds[-1]])
+        for k in range(len(color_bounds)-1):
+            ax_cbar.fill_between(x=[0,1], y1=color_bounds[k+1], y2=color_bounds[k], color=color_list[k])
+
+    # plotting data
+    x_section_scaling = limit__sigma_ref_val_cm2
+    for k, data_dict in enumerate(sensitivity_curve_dict_list):
+        print(data_dict["input"]["limit__wimp_mass_gev_list"])
+        print(data_dict["output"]["median_upper_limit_list"])
+        print(data_dict["output"]["lower_upper_limit_list"])
+        print(data_dict["output"]["upper_upper_limit_list"])
+        ax_plot.plot(
+            data_dict["input"]["limit__wimp_mass_gev_list"],
+            [y*x_section_scaling for y in data_dict["output"]["median_upper_limit_list"]],
+            color = "black",)
+        ax_plot.fill_between(
+            data_dict["input"]["limit__wimp_mass_gev_list"],
+            [y*x_section_scaling for y in data_dict["output"]["lower_upper_limit_list"]],
+            [y*x_section_scaling for y in data_dict["output"]["upper_upper_limit_list"]],
+            interpolate = True,
+            color = color_list[k] if mode=='cbar' else legend_colors[k],
+            zorder = -1,
+            linewidth = 0)
+
+
+    # saving
+    plt.show()
+    for abspathstring in output_abspath_list:
+        fig.savefig(abspathstring)
+    return
+    
+
+
+
+
+
 
 
 
