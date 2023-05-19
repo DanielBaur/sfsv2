@@ -27,7 +27,7 @@ from random import randrange
 import time
 from datetime import timedelta
 import matplotlib.gridspec as gridspec
-
+import random
 
 
 
@@ -224,6 +224,8 @@ def compute_g2_from_detector_configuration(
 
     # computing 'g2'
     g2 = ExtEff*SE
+#    print(ExtEff)
+#    print(SE)
     return g2
 
 
@@ -1761,15 +1763,25 @@ def gen_spectrum_plot(
         default_color = "#2e2e2e" # grey
         default_color = "#454545" # grey
         annotations = {
-            "nr_atm"                                            : [default_color,        [0.01, 0.56],   ["left", "center"],    -4,    7,   r"atmospheric neutrinos"],
-            "combined_nr_background"                            : [color_nrs_default,    [0.44, 0.53],   ["center", "center"],  -12,   7,   r"\textbf{combined NR background (goal)}"],
-            "nr_neutrons_new_baseline"                          : [color_nrs_default,    [0.50, 0.33],   ["center", "center"],  -16,   7,   r"\textbf{radiogenic neutrons (achieved)}"],
-            "nr_neutrons_new_improved_ptfe_and_pmts_and_cryo"   : [color_nrs_default,    [0.50, 0.19],   ["center", "center"],  -16,   7,   r"\textbf{radiogenic neutrons (goal)}"],
-            "nr_dsnb"                                           : [default_color,        [0.54, 0.01],   ["right", "bottom"],   -36,   7,   r"DSNB neutrinos"],
-            "nr_hep"                                            : [default_color,        [0.28, 0.01],   ["right", "bottom"],   -83,   7,   r"solar $hep$ neutrinos"],
-            "nr_b8"                                             : [default_color,        [0.20, 0.01],   ["right", "bottom"],   -86,   7,   r"solar $^{8}\mathrm{B}$ neutrinos"],
-            "wimps"                                             : [color_wimps_default,  [0.40, 0.74],   ["center", "center"],  -15,   7,   r"WIMPs"],
-            "wimps2"                                            : [color_wimps_default,  [0.39, 0.67],   ["center", "center"],  -15,   6,   r"($40\,\frac{\mathrm{GeV}}{c^2}$, $10^{-48}\,\mathrm{cm^2}$)"],
+#            "nr_atm"                                            : [default_color,        [0.01, 0.56],   ["left", "center"],    -4,    7,   r"atmospheric neutrinos"],
+#            "combined_nr_background"                            : [color_nrs_default,    [0.44, 0.53],   ["center", "center"],  -12,   7,   r"\textbf{combined NR background (goal)}"],
+#            "nr_neutrons_new_baseline"                          : [color_nrs_default,    [0.50, 0.33],   ["center", "center"],  -16,   7,   r"\textbf{radiogenic neutrons (goal)}"],
+#            "nr_neutrons_new_improved_ptfe_and_pmts_and_cryo"   : [color_nrs_default,    [0.50, 0.19],   ["center", "center"],  -16,   7,   r"\textbf{radiogenic neutrons (achieved)}"],
+#            "nr_dsnb"                                           : [default_color,        [0.54, 0.01],   ["right", "bottom"],   -36,   7,   r"DSNB neutrinos"],
+#            "nr_hep"                                            : [default_color,        [0.28, 0.01],   ["right", "bottom"],   -83,   7,   r"solar $hep$ neutrinos"],
+#            "nr_b8"                                             : [default_color,        [0.20, 0.01],   ["right", "bottom"],   -86,   7,   r"solar $^{8}\mathrm{B}$ neutrinos"],
+#            "wimps"                                             : [color_wimps_default,  [0.40, 0.74],   ["center", "center"],  -15,   7,   r"WIMPs"],
+#            "wimps2"                                            : [color_wimps_default,  [0.39, 0.67],   ["center", "center"],  -15,   6,   r"($40\,\frac{\mathrm{GeV}}{c^2}$, $10^{-48}\,\mathrm{cm^2}$)"],
+#            "wimpseroi"                                         : [default_color,        [0.76, 0.98],   ["right", "top"],        0,  10,   r"WIMP EROI"],
+#            "nr_atm"                                            : [default_color,        [0.01, 0.74],   ["left", "center"],    -7,    7,   r"atmospheric neutrinos"],
+            "nr_atm"                                            : [default_color,        [0.31, 0.62],   ["left", "center"],    -19,   7,   r"atmospheric neutrinos"],
+            "combined_nr_background"                            : [color_nrs_default,    [0.45, 0.70],   ["center", "center"],  -24,   7,   r"\textbf{combined NR background (goal)}"],
+            "nr_neutrons_new_baseline"                          : [color_nrs_default,    [0.40, 0.47],   ["center", "center"],  -28,   7,   r"\textbf{radiogenic neutrons (achieved)}"],
+            "nr_neutrons_new_improved_ptfe_and_pmts_and_cryo"   : [color_nrs_default,    [0.38, 0.37],   ["center", "center"],  -28,   7,   r"\textbf{radiogenic neutrons (goal)}"],
+            "nr_dsnb"                                           : [default_color,        [0.41, 0.01],   ["right", "bottom"],   -48,   7,   r"DSNB neutrinos"],
+            "nr_hep"                                            : [default_color,        [0.25, 0.01],   ["right", "bottom"],   -85,   7,   r"solar $hep$ neutrinos"],
+            "nr_b8"                                             : [default_color,        [0.17, 0.01],   ["right", "bottom"],   -87,   7,   r"solar $^{8}\mathrm{B}$ neutrinos"],
+            "wimps"                                             : [color_wimps_default,  [0.73, 0.48],   ["center", "center"],  -52,   7,   r"WIMPs ($100\,\frac{\mathrm{GeV}}{c^2}$, $5\cdot 10^{-49}\,\mathrm{cm^2}$)"],
             "wimpseroi"                                         : [default_color,        [0.76, 0.98],   ["right", "top"],        0,  10,   r"WIMP EROI"],
         }
         for ann in [*annotations]:
@@ -2106,7 +2118,7 @@ def install_detector_header_file(
 
 def execNEST(
     spectrum_dict, # dict, dictionary resembling the input spectrum to be simulated by NEST
-    baseline_drift_field_v_cm, # float, baseline electrical drift field, this needs to be given since parameters of the NEST detector header file (.hh) depend on the drift field (e.g., 'dtCntr')
+    baseline_drift_field_v_cm, # float, NOTE (!), baseline electrical drift field, this needs to be given for the step 'detector adaptation' since parameters of the NEST detector header file (.hh) depend on the drift field (e.g., 'dtCntr'), THE ACTUAL DRIFT FIELD TO BE SIMULATED IS GIVEN WITH THE SPECTRUM DICT !
     baseline_detector_dict, # dict, 'detector_dict' of the DARWIN baseline detector
     detector_dict = {}, # dict, resembling the detector to be installed, no new detector is installed if empty
     detector_name = "", # string, name of the detector, only required when not referring to an existing file
@@ -2117,6 +2129,7 @@ def execNEST(
     flag_min_selection_fraction = 0.05, # float, minimum number of events with non-negative S1 or S2 signal
     flag_sign_flip = [False,True][1], # string, how to handle negative-flagged NEST output
     flag_event_selection = ["remove_-1e-6_events"][0], # string, "remove_-1e-6_events" removes all events with -1e-6 values
+    flag_detector_installation = ["none", "do_not_install"][0],
 ):
 
     """
@@ -2132,10 +2145,14 @@ def execNEST(
     debug_list = []
 
     ### detector adaptation
-    if detector_dict == {} and float(baseline_drift_field_v_cm)==float(spectrum_dict["field_drift[V/cm]"]):
+    if flag_detector_installation=="do_not_install":
+        print(f"forced to not install detector --> running with the pre-installed detector")
+        pass
+    elif detector_dict == {} and float(baseline_drift_field_v_cm)==float(spectrum_dict["field_drift[V/cm]"]):
         if flag_verbose: print(f"{fn}: no detector specified --> running with the pre-installed detector")
         pass
     else:
+#        print(f"{fn}: installing new detector")
 #        if type(detector_dict)==str:
 #            if detector_dict.endswith(".hh"):
 #                detector_name = list(detector_dict[:-3].split("/"))[-1]
@@ -2171,7 +2188,15 @@ def execNEST(
 
     ### executing the 'execNEST' executable to simulate the input spectrum
     text_add="\n" if detector_dict != {} else ""
+    safety_factor_n_events_list = []
     if flag_verbose: print(text_add +f"{fn}: compiling the 'execNEST' command strings")
+#    if spectrum_dict["E_min[keV]"] < 2:
+#        safety_factor_n_events = 10 # 'safety_factor_n_events'-many more events are being generated with NEST, afterwards the appropriate number of events is randomly extracted.
+#    elif spectrum_dict["E_min[keV]"] < 5:
+#        safety_factor_n_events = 3
+#    else spectrum_dict["E_min[keV]"] < 5:
+#        safety_factor_n_events = 2
+    safety_factor_n_events = 3
     if spectrum_dict["type_interaction"] in ["ER", "NR", "gamma", "beta"]:
         # non-necessary default values
         default_seed = 0
@@ -2188,7 +2213,7 @@ def execNEST(
         if type(spectrum_dict["numEvts"]) in [str,int]:
             cmd_string = " ".join([
                 abspathfile_execNEST_binary,
-                str(spectrum_dict["numEvts"]),
+                str(safety_factor_n_events*spectrum_dict["numEvts"]),
                 str(spectrum_dict["type_interaction"]),
                 str(spectrum_dict["E_min[keV]"]),
                 str(spectrum_dict["E_max[keV]"]),
@@ -2196,6 +2221,7 @@ def execNEST(
                 str(xyz),
                 str(seed)])
             cmd_list.append(cmd_string)
+            safety_factor_n_events_list.append(safety_factor_n_events)
         # case: spectrum consists of multiple energy intervals (typically used for actual spectra processing)
         elif hasattr(spectrum_dict["numEvts"], "__len__"):
             # checking validity of input 'spectrum_dict'
@@ -2208,7 +2234,7 @@ def execNEST(
                 if float(spectrum_dict["numEvts"][k]) > 0: # sometimes you automatically generate spectrum histograms with empty bins
                     cmd_string = " ".join([
                         abspathfile_execNEST_binary,
-                        str(spectrum_dict["numEvts"][k]),
+                        str(safety_factor_n_events*int(spectrum_dict["numEvts"][k])),
                         str(spectrum_dict["type_interaction"]),
                         str(spectrum_dict["E_min[keV]"][k]),
                         str(spectrum_dict["E_max[keV]"][k]),
@@ -2216,10 +2242,12 @@ def execNEST(
                         str(xyz),
                         str(seed)])
                     cmd_list.append(cmd_string)
+                    safety_factor_n_events_list.append(safety_factor_n_events)
 
     ### looping over all commands and executing them
     if flag_verbose: print(f"{fn}: executing the 'execNEST' command strings")
-    for k, cmd_string in enumerate(cmd_list):
+    execNEST_output_ndarray_list = []
+    for k, cmd_string in enumerate(cmd_list): # Warning: 'cmd_list' and 'spectrum_dict["numEvts"]' do not necessarily have the same length due to filtering out 'cmd_string's with 'numEvts'-value of zero
 
         # executing the 'execNEST' C++ executable
         cmd_print_string = "execNEST " +" ".join(list(cmd_string.split(" "))[1:])
@@ -2292,31 +2320,54 @@ def execNEST(
                 this_nest_run_tuple_list.append(execNEST_output_tuple)
             else:
                 continue
-        execNEST_output_tuple_list += this_nest_run_tuple_list
-        num = int(list(cmd_string.split(" "))[1])
-        e_min = float(list(cmd_string.split(" "))[3])
-        e_max = float(list(cmd_string.split(" "))[3])
-        if len(this_nest_run_tuple_list) != num: raise Exception(f"This NEST run yielded {len(this_nest_run_tuple_list)} events instead of the specified {num} at E_min={e_min} and E_max={max}.")
 
-    # casting the 'execNEST_output_tuple_list' into a ndarray
-    if flag_verbose: print(f"{fn}: casting 'execNEST_output_tuple_list' into numpy ndarray")
-    execNEST_output_ndarray = np.array(execNEST_output_tuple_list, execNEST_dtype)
+        # casting the 'execNEST_output_tuple_list' into a ndarray
+        if flag_verbose: print(f"{fn}: casting 'execNEST_output_tuple_list' into numpy ndarray")
+        this_nest_run_ndarray = np.array(this_nest_run_tuple_list, execNEST_dtype)
 
-    # removing negative-flagged events from output
-    if flag_event_selection == "remove_-1e-6_events":
-        if flag_verbose: print(f"{fn}: removing -1e-6-flagged events")
-        len_total = len(execNEST_output_ndarray)
-        execNEST_output_ndarray = execNEST_output_ndarray[
-            ((execNEST_output_ndarray["S1_3Dcor [phd]"] < -1e-06) |
-            (execNEST_output_ndarray["S1_3Dcor [phd]"] > 1e-06)) &
-            ((execNEST_output_ndarray["S2_3Dcorr [phd]"] < -1e-06) |
-            (execNEST_output_ndarray["S2_3Dcorr [phd]"] > 1e-06))
-        ]
-        len_selected = len(execNEST_output_ndarray)
-        if flag_verbose: print(f"\tselected {len_selected} out of {len_total} events")
-        selection_fraction = len_selected/len_total
-        if selection_fraction < flag_min_selection_fraction:
-            raise Exception(f"ERROR: 'selection_fraction' = {selection_fraction} < {flag_min_selection_fraction} = 'flag_min_selection_fraction'")
+        # selecting non-weird events from output
+        if flag_event_selection == "remove_-1e-6_events":
+            if flag_verbose: print(f"{fn}: removing -1e-6-flagged events")
+            len_total = len(this_nest_run_ndarray)
+            this_nest_run_ndarray = this_nest_run_ndarray[
+                ((this_nest_run_ndarray["S1_3Dcor [phd]"] < -1e-06) |
+                (this_nest_run_ndarray["S1_3Dcor [phd]"] > 1e-06)) &
+                ((this_nest_run_ndarray["S2_3Dcorr [phd]"] < -1e-06) |
+                (this_nest_run_ndarray["S2_3Dcorr [phd]"] > 1e-06))
+            ]
+            len_selected = len(this_nest_run_ndarray)
+            if flag_verbose: print(f"\tselected {len_selected} out of {len_total} events")
+            selection_fraction = len_selected/len_total
+            if selection_fraction < flag_min_selection_fraction:
+                raise Exception(f"ERROR: 'selection_fraction' = {selection_fraction} < {flag_min_selection_fraction} = 'flag_min_selection_fraction'")
+
+        # correcting for 'safety_factor_n_events'
+        if flag_event_selection == "remove_-1e-6_events":
+            if flag_verbose: print(f"extracting the wanted number of events")
+            len_this_ndarray = len(this_nest_run_ndarray)
+            n_wanted_events = int(int(list(cmd_string.split(" "))[1]) / safety_factor_n_events_list[k])
+            if n_wanted_events > len_this_ndarray:
+                error_message_a = f"ERROR: 'n_wanted_events'={n_wanted_events}>{len_this_ndarray}='len_this_ndarray'"
+                error_message_b = f"\n'cmd_string'='{cmd_string}'"
+                raise Exception(error_message_a +error_message_b)
+            extracted_indices = list(range(0, len_this_ndarray))
+            random.shuffle(extracted_indices)
+            extracted_indices = extracted_indices[0:n_wanted_events]
+            this_nest_run_ndarray = this_nest_run_ndarray[extracted_indices]
+
+        # appending this NEST run's data to 'execNEST_output_ndarray_list'
+        execNEST_output_ndarray_list.append(this_nest_run_ndarray)
+
+
+    # concatenating every ndarray within 'execNEST_output_ndarray_list'
+#    execNEST_output_tuple_list += this_nest_run_tuple_list
+#    num = int(list(cmd_string.split(" "))[1])
+#    e_min = float(list(cmd_string.split(" "))[3])
+#    e_max = float(list(cmd_string.split(" "))[3])
+#    if len(this_nest_run_tuple_list) != num: raise Exception(f"This NEST run yielded {len(this_nest_run_tuple_list)} events instead of the specified {num} at E_min={e_min} and E_max={max}.")
+    execNEST_output_ndarray = np.concatenate(tuple(execNEST_output_ndarray_list))
+
+
 
     return execNEST_output_ndarray
 
@@ -2657,13 +2708,18 @@ def calc_er_nr_discrimination_line(
         print("Ratio of ER-Events left below the discrimination line:",er_rejection)
 
     output_dict = {
+        "total_er_in_eroi" : total_er,
+        "total_er_in_eroi_below_discrimination_line" : total_er_remaining,
+        "total_nr_in_eroi" : total_nr,
+        "actual_nr_acceptance" : total_nr_below_discr_line/total_nr,
         "dl_x_data_s1_over_g1": list(dl_x_data),
         "dl_y_data_s2_over_s1": list(dl_y_data),
         "dl_x_data_s1": list(dl_S1_data),
         "dl_y_data_s2": list(dl_S2_data),
-        "nr_acceptance": float(nr_acceptance),
+        "nominal_nr_acceptance": float(nr_acceptance),
         "er_rejection": float(er_rejection),
-        "er_rejection_uncertainty": np.sqrt(2)*(np.sqrt(total_er)/total_er), # with Poissontian uncertainties approximated as np.sqrt, since statistics sufficiently high
+#        "er_rejection_uncertainty": np.sqrt(2)*(np.sqrt(total_er)/total_er), # with Poissontian uncertainties approximated as np.sqrt, since statistics sufficiently high
+        "er_rejection_uncertainty": np.sqrt(((1/total_er)*np.sqrt(total_er_remaining))**2 +((total_er_remaining/total_er**2)*np.sqrt(total_er))**2),
 #        "nr_below_dl": list(nr_below_dl),
     }
 
@@ -3866,13 +3922,13 @@ def calculate_wimp_parameter_exclusion_curve(
             if flag_verbose : print(f"\t\tminimizing -1*'log_likelihood_function'")
             mle = minimize(
                 fun = lambda x : neg_log_likelihood_function(x[0],x[1],x[2]),
-                x0   = [0.01,0.9,0.91],
+                x0   = [0.0000000000000001,0.9,0.91],
                 #bounds = [[0,10000], [0.00001,5], [0.00001,5]],
 #                method = None,)
                 options = {
                     "xtol" : 0.00000000000000000000000000001,
                     "ftol" : 0.00000000000000000000000000001},
-                method = "Powell",)
+                method = "Nelder-Mead",)
 
             mle_sigma = np.absolute(mle.x[0])
             mle_thetavec = [np.absolute(mle.x[1]),np.absolute(mle.x[2])]
@@ -3903,7 +3959,7 @@ def calculate_wimp_parameter_exclusion_curve(
                         options = {
                             "xtol" : 0.00000000000000000000000000001,
                             "ftol" : 0.00000000000000000000000000001},
-                        method = "Powell",)
+                        method = "Nelder-Mead",)
                     theta_er_hathat = np.absolute(hathat.x[0])
                     theta_nr_hathat = np.absolute(hathat.x[1])
 #                    print(f"\ntheta hathat")
@@ -3937,8 +3993,9 @@ def calculate_wimp_parameter_exclusion_curve(
                 if flag_really_plot_test_statiscs == True:
                     if flag_verbose : print(f"\t\ttest statistic plot")
 #                    x_data = np.geomspace(start=0.000003, stop=0.003, num=150, endpoint=True)
-                    x_data = np.geomspace(start=0.0002, stop=0.002, num=150, endpoint=True)
-                    x_data = np.linspace(start=0.0002, stop=0.0040, num=150, endpoint=True)
+                    n_x_data = 10
+                    x_data = np.geomspace(start=0.0002, stop=0.002, num=n_x_data, endpoint=True)
+                    x_data = np.linspace(start=0.0002, stop=0.0040, num=n_x_data, endpoint=True)
                     y_data = [test_statistic(x) for x in x_data]
 #                    print(x_data)
 #                    print(y_data)
@@ -3980,6 +4037,7 @@ def calculate_wimp_parameter_exclusion_curve(
                     flag_really_plot_upper_limit_root_finding = True
                 # plotting
                 if flag_really_plot_upper_limit_root_finding == True:
+                    print(f"This should actually be displayed. Why isn't it?")
                     print(f"\t\t--->{upper_limit}")
 
 
@@ -4104,6 +4162,7 @@ def plot_sensitivity_curve_comparison(
     plot_logyscale                  = False, # bool, indicating whether the y-axis is scaled logarithmically
     plot_x_axlim                    = [10,1000], # list of two floats, x-axis limits in GeV, ignored if empty list
     plot_y_axlim                    = [], # list of two floats, y-axis limits in cm^2, ignored if empty list
+    limit__sigma_ref_val_cm2        = 10**(-45),
     # other
     output_abspath_list             = [], # list of abspathstrings, the generated plot is saved as and to all specified locations
 ):
