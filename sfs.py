@@ -224,8 +224,8 @@ def compute_g2_from_detector_configuration(
 
     # computing 'g2'
     g2 = ExtEff*SE
-#    print(ExtEff)
-#    print(SE)
+    print(f"'ExtEff'={ExtEff}")
+    print(f"'SE'={SE}")
     return g2
 
 

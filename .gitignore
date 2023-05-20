@@ -50,3 +50,5 @@ nr_dsnb_deprecated.csv
 nr_atm_deprecated.csv
 example__signature__darwin_baseline_detector__er_background_high_stat.npy
 example__signature__darwin_baseline_detector__nr_background_high_stat.npy
+*high_stat*.npy
+*medium_stat*.npy
