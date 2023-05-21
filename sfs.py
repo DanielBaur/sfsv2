@@ -28,6 +28,8 @@ import time
 from datetime import timedelta
 import matplotlib.gridspec as gridspec
 import random
+import itertools
+import datetime
 
 
 
@@ -121,6 +123,31 @@ def write_dict_to_json(output_pathstring_json_file, save_dict):
     with open(output_pathstring_json_file, "w") as json_output_file:
         json.dump(save_dict, json_output_file, indent=4)
     return
+
+
+# This function is used to infer an absolute parameter value from a parameter interval.
+def get_absolute_parameter_value(
+    parameter_interval,
+    rel_share,
+):
+    return parameter_interval[0] +rel_share*(parameter_interval[1]-parameter_interval[0])
+
+# This function is used to convert the typically used ER energy scale to the NR equivalent.
+# The function is taken from the LUX ER/NR discrimination paper (https://arxiv.org/abs/2004.06304).
+# Note that (20th May 2023) the only instance where this conversion is used is to also display the NR energies for the exemplary signature plot.
+def convert_recoil_energy_scale(
+    input_e_kev,
+    input_recoil_type = ["ER", "NR"][0],
+):
+    A = 0.173
+    gamma = 1.05
+    if input_recoil_type=="ER":
+        output_e_kev = (input_e_kev/A)**(1/gamma)
+    elif input_recoil_type=="NR":
+        output_e_kev = A *input_e_kev**gamma
+    else:
+        raise Exception(f"Wrong input: 'input_recoil_type'={input_recoil_type}.\n'input_recoil_type' must be element from the following list: ['ER', 'NR'].")
+    return output_e_kev
 
 
 def compute_array_sum(array_list):
@@ -219,13 +246,13 @@ def compute_g2_from_detector_configuration(
     rho = 1.0 / ((RidealGas*T_Kelvin)**3 / (p_Pa*(RidealGas*T_Kelvin)**2 +RealGasA*p_Pa*p_Pa) +RealGasB) # Van der Waals equation, mol/m^3
     rho = rho *molarMass * 1e-6
     elYield = (alpha*detector_dict["E_gas"]*1e3 -beta*(NEST_AVO*rho/molarMass))*gasGap*0.1
-    SE = elYield *detector_dict["g1_gas"] *0.5 # I have no idea where this factor of 0.5 comes from... I added it such that the function outputs the same value as the NEST onscreen output
+    SE = elYield *detector_dict["g1_gas"] # I have no idea where this factor of 0.5 comes from... I added it such that the function outputs the same value as the NEST onscreen output
     #print(ExtEff, SE)
 
     # computing 'g2'
     g2 = ExtEff*SE
-    print(f"'ExtEff'={ExtEff}")
-    print(f"'SE'={SE}")
+#    print(f"'ExtEff'={ExtEff}")
+#    print(f"'SE'={SE}")
     return g2
 
 
@@ -2146,7 +2173,6 @@ def execNEST(
 
     ### detector adaptation
     if flag_detector_installation=="do_not_install":
-        print(f"forced to not install detector --> running with the pre-installed detector")
         pass
     elif detector_dict == {} and float(baseline_drift_field_v_cm)==float(spectrum_dict["field_drift[V/cm]"]):
         if flag_verbose: print(f"{fn}: no detector specified --> running with the pre-installed detector")
@@ -2419,6 +2445,7 @@ def gen_signature_plot(
     plot_discrimination_line_dict = {},
     # flags
     flag_output_abspath_list = [],
+    flag_gray_out_events_outside_wimp_eroi = [True, False][0],
     flag_output_filename = "signature_plot.png",
     flag_profile = ["default"][0],
     flag_verbose = False,
@@ -2434,13 +2461,32 @@ def gen_signature_plot(
 
     # canvas
     if flag_verbose: print(f"{fn}: setting up canvas and axes")
+    # setting up the canvas
+    if flag_verbose: print(f"{fn}: setting up canvas and axes")
     fig = plt.figure(
         figsize = [plot_figure_size_x_inch, plot_figure_size_x_inch*plot_aspect_ratio],
         dpi = 150,
-        constrained_layout = True) 
+        constrained_layout = False) 
+    spec = gridspec.GridSpec(
+        ncols = 3,
+        nrows = 3,
+        figure = fig,
+        top = 0.995, # fixed
+        bottom = 0.005, # fixed
+        left = 0.005, # fixed
+        right = 0.995, # fixed
+        wspace = 0.0, # fixed
+        hspace = 0.0, # fixed
+        width_ratios = [0.115, 0.855, 0.030],
+        height_ratios = [0.020, 0.865, 0.115],)
 
     # axes
-    ax1 = fig.add_subplot()
+    ax1 = fig.add_subplot(spec[1,1])
+#    for k, spine in ax1.spines.items():
+#        spine.set_zorder(10)
+    ax1.tick_params(which="major", zorder=11)
+    ax1.tick_params(which="minor", zorder=11)
+#    ax1.set_zorder(10)
     if plot_log_y_axis: ax1.set_yscale('log')
     if plot_log_x_axis: ax1.set_xscale('log')
     if plot_xlim != [] : ax1.set_xlim(plot_xlim)
@@ -2455,7 +2501,7 @@ def gen_signature_plot(
     # defining defbbault scatter format
     default_scatter_format_dict = {
         "alpha" : 1,
-        "zorder" : 1,
+#        "zorder" : -2,
         "marker" : "o", # markerstyle, see: https://matplotlib.org/stable/api/markers_api.html#module-matplotlib.markers
         "linewidths" : 0.0,
         "s" : 2,
@@ -2482,10 +2528,11 @@ def gen_signature_plot(
             format_dict.update({key : signature_dict[key]})
 
         # plotting the current signature
-        ax1.scatter( plot_x_data, plot_y_data, **format_dict)
+        ax1.scatter( plot_x_data, plot_y_data, zorder=-2, **format_dict)
 
     # plotting the energy contour lines
-    for recoil_energy_kev_ee in plot_energy_contours:
+    energy_contour_data = []
+    for k, recoil_energy_kev_ee in enumerate(plot_energy_contours):
         plot_energy_contour_x, plot_energy_contour_y = energy_contour_line_in_s2_over_s1(recoil_energy_kev_ee, detector_dict)
         if plot_axes_units == "cs2_over_cs1_vs_cs1_over_g1":
             plot_energy_contour_x, plot_energy_contour_y = convert_from_s2_vs_s1_to_s2_over_s1_vs_s1_over_g1(plot_energy_contour_x, plot_energy_contour_y, detector_dict)
@@ -2496,6 +2543,7 @@ def gen_signature_plot(
             linewidth = 0.5,
             linestyle = "-",
             zorder = 5,)
+        energy_contour_data.append([plot_energy_contour_x, plot_energy_contour_y])
         index = np.argmin(np.abs(np.array(plot_energy_contour_y)-plot_ylim[0]))
         ax1.text(
             x = (ax1.transAxes + ax1.transData.inverted()).inverted().transform([plot_energy_contour_x[index],1])[0],
@@ -2506,6 +2554,34 @@ def gen_signature_plot(
             color = "black",
             horizontalalignment = "left",
             verticalalignment = "bottom",)
+
+    # graying out the data outside the WIMP eroi
+    #if flag_gray_out_events_outside_wimp_eroi:
+    #    format_dict.update({
+    #        "alpha" : 1,
+    #        "facecolors" : "grey",
+    #    })
+    #    ax1.scatter(plot_x_data, plot_y_data, **format_dict,)
+    left_energy_contour_x_data = energy_contour_data[0][0]
+    left_energy_contour_y_data = energy_contour_data[0][1]
+    right_energy_contour_x_data = energy_contour_data[-1][0]
+    right_energy_contour_y_data = energy_contour_data[-1][1]
+    ax1.fill_between(
+        x = left_energy_contour_x_data,
+        y1 = left_energy_contour_y_data,
+        y2 = [0 for val in left_energy_contour_y_data],
+        color = "white",
+        zorder = 1,
+        linewidth = 0,)
+    ax_ylim = ax1.get_ylim
+    print(ax_ylim)
+    ax1.fill_between(
+        x = right_energy_contour_x_data,
+        y1 = [100000 for val in right_energy_contour_x_data],
+        y2 = right_energy_contour_y_data,
+        color = "white",
+        zorder = 1,
+        linewidth = 0,)
 
     # plot discrimination line
     dl_x_data = plot_discrimination_line_dict["dl_x_data_s1_over_g1"] if plot_axes_units=="cs2_over_cs1_vs_cs1_over_g1" else plot_discrimination_line_dict["dl_x_data_s1"]
@@ -2602,6 +2678,179 @@ def calculate_distribution_width_around_value(
     #print(f"'lower' = {lower}")
     #print(f"'upper' = {upper}")
     return val, lower, upper
+
+
+def conduct_cartesian_product_of_leakage_fraction_checks(
+    check_parameter_dict, # dictionary containing lists of parameters to be checked
+    default_detector_parameter_dict, # dictionary containing the default parameters of the examined detector
+    default_detector_e_drift, # default drift field value of the detector
+    abspathstring_er_background_spectrum_dict, # abspathstring of the ER background spectrum dict
+    abspathstring_nr_background_spectrum_dict, # abspathstring of the NR background spectrum dict
+    wimp_eroi_kev_ee,
+    discrimination_line_bins,
+    nr_acceptance,
+    flag_g1_gas_depending_on_g1 = [False,True,0.96][0], # in my Ph.D. study I assumed g1_gas \approx g1
+    abspath_save_output_detector_header_files_here = [],
+):
+
+    """
+    This function is used to conduct one leakage fraction check for every cartesian product tuple specified.
+    """
+
+    # definitions
+    parameter_name_list = list([*check_parameter_dict])
+    parameter_value_list = [check_parameter_dict[parameter_name] for parameter_name in [*check_parameter_dict]]
+    parameter_check_list = []
+    for parameter_tuple in itertools.product(*parameter_value_list):
+        parameter_check_list.append(list(parameter_tuple))
+    n_checks = len(parameter_check_list)
+    time_list = [datetime.datetime.now()]
+    leakage_fraction = 0
+    raw_data_dtype_list = [(parameter_name, np.float64) for parameter_name in parameter_name_list]
+    raw_data_dtype_list = raw_data_dtype_list +[("leakage_fraction", np.float64), ("leakage_fraction_uncertainty", np.float64)]
+    flag_e_drift_among_parameters = True if "e_drift" in parameter_name_list else False
+
+
+    # start data generation
+    print(f"starting leakage fraction check for {n_checks} detectors at 't_i' = {time_list[0]}")
+    ctr = 0
+    lf_check_tuple_list = []
+
+    # looping over all parameter combinations
+    for l, parameter_check in enumerate(parameter_check_list):
+
+        # starting leakage fraction check
+        parameter_check_dict = {parameter_name : parameter_check_list[l][m] for m, parameter_name in enumerate(parameter_name_list)}
+        print(f"starting check #{ctr+1}/{n_checks}")
+        print(f"\tparameters:")
+        for parameter_name in [*parameter_check_dict]:
+            print(f"\t\t'{parameter_name}' =  {parameter_check_dict[parameter_name]}")
+        
+        # generating the detector
+        print(f"\tgenerating the detector:")
+        current_detector_dict = default_detector_parameter_dict.copy()
+        try:
+            current_detector_dict_update = parameter_check_dict.copy()
+            current_e_field = current_detector_dict_update.pop("e_drift")
+        except:
+            current_detector_dict_update = parameter_check_dict.copy()
+            current_e_field = default_detector_e_drift
+        # adapting 'g1_gas' based on 'g1'
+        if flag_g1_gas_depending_on_g1==True:
+            if "g1" in parameter_name_list:
+                current_detector_dict_update.update({"g1_gas":parameter_check_dict["g1"]})
+                print(f"\t\tsetting 'g1_gas'='g1', with 'g1' taken from input parameters")
+            else:
+                current_detector_dict_update.update({"g1_gas":default_detector_parameter_dict["g1"]})
+                print(f"\t\tsetting 'g1_gas'='g1', with 'g1' taken from baseline detector")
+            if "g1_gas" in parameter_name_list:
+                raise Exception(f"You specified both a 'g1_gas' paramter scan and set 'flag_set_g1_gas_equal_to_g1'=True. That's falsch!")
+        elif type(flag_g1_gas_depending_on_g1)==float:
+            if "g1" in parameter_name_list:
+                current_detector_dict_update.update({"g1_gas":flag_g1_gas_depending_on_g1*parameter_check_dict["g1"]})
+                print(f"\t\tsetting 'g1_gas'={flag_g1_gas_depending_on_g1}*'g1', with 'g1' taken from input parameters")
+            else:
+                current_detector_dict_update.update({"g1_gas":flag_g1_gas_depending_on_g1*default_detector_parameter_dict["g1"]})
+                print(f"\t\tsetting 'g1_gas'={flag_g1_gas_depending_on_g1}*'g1', with 'g1' taken from baseline detector")
+            if "g1_gas" in parameter_name_list:
+                raise Exception(f"You specified both a 'g1_gas' paramter scan and set 'flag_set_g1_gas_equal_to_g1'=True. That's falsch!")
+        current_detector_dict.update(current_detector_dict_update)
+        #print(f"'current_detector_dict_update'={current_detector_dict_update}")
+        #print(f"'e_field'={current_e_field}")
+        
+        # generating the ER and NR signatures
+        print(f"\tgenerating the ER signature:")
+        datetimestring = current_datetimestring()
+        er_spectrum_dict = get_dict_from_json(abspathstring_er_background_spectrum_dict)
+        er_spectrum_dict.update({
+            "field_drift[V/cm]" : str(current_e_field), # NOTE: Don't be confused, the drift field is generally specified in the spectrum dict
+            "seed"              : str(randrange(10000001)),})
+        er_background_ndarray = execNEST(
+            spectrum_dict = er_spectrum_dict,
+            baseline_detector_dict = default_detector_parameter_dict,
+            baseline_drift_field_v_cm = default_detector_e_drift,
+            detector_dict = current_detector_dict_update,
+#            detector_name = datetimestring +f"__er_leakage_check_detector__{ctr+1}",
+            detector_name = f"leakage_fraction_check_detector__{ctr+1}__" +datetimestring,
+            abspath_list_detector_dict_json_output = [abspath_save_output_detector_header_files_here],
+            flag_verbose = False,
+            flag_print_stdout_and_stderr = False,)
+        print(f"\tgenerating the NR signature:")
+        nr_spectrum_dict = get_dict_from_json(abspathstring_nr_background_spectrum_dict)
+        nr_spectrum_dict.update({
+            "field_drift[V/cm]" : str(current_e_field),
+            "seed"              : str(randrange(10000001)),})
+        nr_background_ndarray = execNEST(
+            spectrum_dict = nr_spectrum_dict,
+            baseline_detector_dict = default_detector_parameter_dict,
+            baseline_drift_field_v_cm = default_detector_e_drift,
+            detector_dict = current_detector_dict_update,
+            detector_name = f"leakage_fraction_check_detector__{ctr+1}__" +datetimestring,
+            abspath_list_detector_dict_json_output = [abspath_save_output_detector_header_files_here],
+            flag_verbose = False,
+            flag_print_stdout_and_stderr = False,
+            flag_detector_installation="do_not_install",)
+
+        # determining the leakage fraction
+        print(f"\tdetermining the leakage fraction:")
+        discrimination_line_dict = calc_er_nr_discrimination_line(
+            er_spectrum = er_background_ndarray,
+            nr_spectrum = nr_background_ndarray,
+            detector_dict = current_detector_dict,
+            min_energy = wimp_eroi_kev_ee[0],
+            max_energy = wimp_eroi_kev_ee[1],
+            bin_number = discrimination_line_bins,
+            nr_acceptance = nr_acceptance,
+            approx_depth = 24,
+            verbose = False,)
+        #sfs.write_dict_to_json(abspath_discrimination_lines +"example__discrimination_line__default_darwin_detector.json", discrimination_line_dict)
+        leakage_fraction = 1-discrimination_line_dict["er_rejection"]
+        leakage_fraction_uncertainty = discrimination_line_dict["er_rejection_uncertainty"]
+        print(f"\t\t'leakage_fraction'={leakage_fraction}")
+        print(f"\t\t'leakage_fraction_uncertainty'={leakage_fraction_uncertainty}")
+
+        # finishing leakage fraction check
+        time_list.append(datetime.datetime.now())
+        time_delta = str(time_list[-1] -time_list[-2])[:-7]
+        print(f"\tfinished check #{ctr+1}/{n_checks} at {str(time_list[-1])[11:19]} h after {time_delta} h")
+        #time.sleep(5)
+        ctr += 1
+        lf_check_tuple_list_tuple = tuple([parameter_check_dict[pn] for pn in [*parameter_check_dict]] +[leakage_fraction, leakage_fraction_uncertainty])
+        lf_check_tuple_list.append(lf_check_tuple_list_tuple)
+                    
+    # end of data generation
+    time_delta = str(time_list[-1] -time_list[0])[:-7]
+    print(f"finished checking the leakage fraction of {n_checks} detector configurations at {str(time_list[-1])[11:19]} h after {time_delta} h")
+    print(f"casting check results ndarray")
+    leakage_fraction_check_ndarray = np.array(lf_check_tuple_list, raw_data_dtype_list)
+    print(f"\t'leakage_fraction_check_ndarray' column names:")
+    print(f"\t'{leakage_fraction_check_ndarray.dtype.names}")
+    for entry in leakage_fraction_check_ndarray:
+        print(f"\t{entry}")
+
+#    savestring = abspath_er_leakage_study +datetimestring +"__leakage_fraction_check.npy"
+#    np.save(savestring, leakage_fraction_check_ndarray)
+#    print(f"saved '{savestring}'")
+#    lf_check_ndarray = np.load(savestring)
+    if len(leakage_fraction_check_ndarray)==n_checks and list(leakage_fraction_check_ndarray.dtype.names)==[tup[0] for tup in raw_data_dtype_list]:
+        print(f"the saved ndarray has the correct length and column names")
+        print(f"successfully finished leakage fraction check for {n_checks} detectors at 't_i' = {time_list[-1]}")
+    else:
+        print(f"the saved ndarray does NOT have the correct length and/or column names")
+        print(f"!!!!!!!! check the generated data !!!!!!!!!!!!!!")
+        print(f"finished leakage fraction check for {n_checks} detectors at 't_i' = {time_list[-1]}")
+
+    return leakage_fraction_check_ndarray
+
+
+def current_datetimestring():
+    dt = str(datetime.datetime.now())
+    Y = dt[:4]
+    M = dt[5:7]
+    D = dt[8:10]
+    h = dt[-15:-13]
+    m = dt[-12:-10]
+    return Y+M+D+"_"+h+m
 
 
 def calc_er_nr_discrimination_line(
