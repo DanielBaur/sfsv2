@@ -1213,5 +1213,6 @@
     ],
     "nominal_nr_acceptance": 0.5,
     "er_rejection": 0.9951449773550404,
-    "er_rejection_uncertainty": 0.00013148695866821206
+    "leakage_fraction": 0.004855022644959628,
+    "leakage_fraction_uncertainty": 0.00013148695866821206
 }

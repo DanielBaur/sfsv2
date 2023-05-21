@@ -1506,7 +1506,7 @@ def give_spectrum_dict(
     exposure_t_y                            = 30*5, # float, fiducial exposure of the experiment
     num_events                              = [42, "exposure_rounded", "exposure_poisson"][2], # number of generated events, giving an integer will generate exactly that many events, giving 'exposure' will generate events according to 'exposure_t_y' (rounded to the next integer value), giving 'exposure_poisson' will generate an random integer number of events corresponding to a sample drawn from a Poissonian distribution with the parameter corresponding to the exposure of the experiment
     # nest parameters
-    seed                                    = 0, # integer between 0 and 10000000, or "randomint" to generate a random integer between 0 and 10000000
+    seed                                    = 0, # integer between 0 and 10000000, or "randomint" to generate a random integer between 0 and 10000000, random seed used to draw both the number of samples (in Poisson case) and draw the samples for the respective pdf, also the same seed that will be forwarded to NEST
     drift_field_v_cm                        = 200,
     xyz_pos_mm                              = "-1",
     # flags
@@ -1623,7 +1623,7 @@ def give_spectrum_dict(
             if (flag_verbose and flag_number_of_output_spectrum_dicts != 1) : print(f"\tk={k}/{flag_number_of_output_spectrum_dicts-1}")
 
             # drawing the samples from the custom spectrum pdf according to the specified number of events 'num_events'
-            if (k != 0 and num_events=="exposure_poisson") : n_samples = np.random.default_rng(seed=randrange(10000001)).poisson(expected_number_of_events_float, 1)[0]
+            if (k != 0 and num_events=="exposure_poisson") : n_samples = np.random.default_rng(seed=seed).poisson(expected_number_of_events_float, 1)[0]
             if flag_verbose: print(f"\tdrawing {n_samples} samples from the custom spectrum pdf")
             samples = generate_samples_from_discrete_pdf(
                 random_variable_values = recoil_energy_kev_list,
@@ -1726,6 +1726,7 @@ def gen_spectrum_plot(
         wspace = 0.0, # fixed
         hspace = 0.0, # fixed
         width_ratios = [0.115, 0.855, 0.030],
+#        width_ratios = [0.085, 0.895, 0.020],
         height_ratios = [0.020, 0.865, 0.115],)
 
     # axes
@@ -2156,6 +2157,7 @@ def execNEST(
     flag_min_selection_fraction = 0.05, # float, minimum number of events with non-negative S1 or S2 signal
     flag_sign_flip = [False,True][1], # string, how to handle negative-flagged NEST output
     flag_event_selection = ["remove_-1e-6_events"][0], # string, "remove_-1e-6_events" removes all events with -1e-6 values
+    flag_random_shuffle_seed=False, # This seed affects the sample selection drawn from the NEST output, I ONLY set it to True to obtain reproducible results for the DARWIN baseline scenario assessment plots
     flag_detector_installation = ["none", "do_not_install"][0],
 ):
 
@@ -2377,6 +2379,8 @@ def execNEST(
                 error_message_b = f"\n'cmd_string'='{cmd_string}'"
                 raise Exception(error_message_a +error_message_b)
             extracted_indices = list(range(0, len_this_ndarray))
+            if flag_random_shuffle_seed==True:
+                random.seed(spectrum_dict["seed"])
             random.shuffle(extracted_indices)
             extracted_indices = extracted_indices[0:n_wanted_events]
             this_nest_run_ndarray = this_nest_run_ndarray[extracted_indices]
@@ -2437,10 +2441,13 @@ def gen_signature_plot(
     plot_ylim = [],
     plot_axes_units = ["cs2_vs_cs1", "cs2_over_cs1_vs_cs1_over_g1"][1],
     plot_legend = False,
-    plot_legend_bbox_to_anchor = [0.45, 0.63, 0.25, 0.25],
+    plot_legend_bbox_to_anchor = [0.3, 0.5, 0.7, 0.5],
     plot_legend_labelspacing = 0.5,
     plot_legend_fontsize = 9,
     plot_energy_contours = [],
+    plot_energy_contours_rotations = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    plot_energy_contours_pos_ER = [],
+    plot_energy_contours_pos_NR = [],
     plot_text_dict_list = [],
     plot_discrimination_line_dict = {},
     # flags
@@ -2449,6 +2456,8 @@ def gen_signature_plot(
     flag_output_filename = "signature_plot.png",
     flag_profile = ["default"][0],
     flag_verbose = False,
+    flag_histogram_nr_background = [False, {}][0],
+    flag_re_plot_events_below_discrimination_line = [False, {}][0],
 ):
 
     """
@@ -2468,7 +2477,7 @@ def gen_signature_plot(
         dpi = 150,
         constrained_layout = False) 
     spec = gridspec.GridSpec(
-        ncols = 3,
+        ncols = 3 if flag_histogram_nr_background==False else 5,
         nrows = 3,
         figure = fig,
         top = 0.995, # fixed
@@ -2477,7 +2486,7 @@ def gen_signature_plot(
         right = 0.995, # fixed
         wspace = 0.0, # fixed
         hspace = 0.0, # fixed
-        width_ratios = [0.115, 0.855, 0.030],
+        width_ratios = [0.085, 0.895, 0.020] if flag_histogram_nr_background==False else [0.085, 0.780, 0.010, 0.040, 0.085],
         height_ratios = [0.020, 0.865, 0.115],)
 
     # axes
@@ -2492,8 +2501,10 @@ def gen_signature_plot(
     if plot_xlim != [] : ax1.set_xlim(plot_xlim)
     if plot_ylim != [] : ax1.set_ylim(plot_ylim)
     if plot_axes_units == "cs2_over_cs1_vs_cs1_over_g1":
-        ax1.set_xlabel(r"$\frac{\mathrm{c}S_1}{g_1}$ / $\text{number of primary photons}$", fontsize=plot_fontsize_axis_label)
-        ax1.set_ylabel(r"$\frac{\mathrm{c}S_2}{\mathrm{c}S_1}$ / $\mathrm{\frac{phd}{phd}}$", fontsize=plot_fontsize_axis_label)
+#        ax1.set_xlabel(r"$\frac{\mathrm{c}S_1}{g_1}$ / $\text{number of primary photons}$", fontsize=plot_fontsize_axis_label)
+#        ax1.set_ylabel(r"$\frac{\mathrm{c}S_2}{\mathrm{c}S_1}$ / $\mathrm{\frac{phd}{phd}}$", fontsize=plot_fontsize_axis_label)
+        ax1.set_xlabel(r"number of primary photons, $\frac{\mathrm{c}S_1}{g_1}$", fontsize=plot_fontsize_axis_label, labelpad=-1)
+        ax1.set_ylabel(r"charge-to-light ratio, $\frac{\mathrm{c}S_2}{\mathrm{c}S_1}$", fontsize=plot_fontsize_axis_label, labelpad=3)
     elif plot_axes_units == "cs2_vs_cs1":
         ax1.set_xlabel(r"$\mathrm{c}S_1$ / $\mathrm{phd}$", fontsize=plot_fontsize_axis_label)
         ax1.set_ylabel(r"$\mathrm{c}S_2$ / $\mathrm{phd}$", fontsize=plot_fontsize_axis_label)
@@ -2522,6 +2533,16 @@ def gen_signature_plot(
             plot_x_data = data["S1_3Dcor [phd]"]
             plot_y_data = data["S2_3Dcorr [phd]"]
 
+        # determining the number of events within the WIMP EROI
+        n_within_eroi = len(reduce_nest_signature_to_eroi(
+            sim_ndarray = signature_dict["signature_ndarray"],
+            detector_dict = detector_dict,
+            eroi = [plot_energy_contours[0], plot_energy_contours[-1]],
+            s1_selection_window = [],
+            s2_selection_window = [], ))
+        if flag_verbose: print(f"\tnumber of {signature_dict['label']} events within EROI: {n_within_eroi}")
+
+
         # formatting the current signature
         format_dict = default_scatter_format_dict.copy()
         for key in [k for k in [*signature_dict] if k not in ["signature_ndarray", "latex_label"]]:
@@ -2546,42 +2567,48 @@ def gen_signature_plot(
         energy_contour_data.append([plot_energy_contour_x, plot_energy_contour_y])
         index = np.argmin(np.abs(np.array(plot_energy_contour_y)-plot_ylim[0]))
         ax1.text(
-            x = (ax1.transAxes + ax1.transData.inverted()).inverted().transform([plot_energy_contour_x[index],1])[0],
-            y = 0.024,
-            s = r"$" +f"{recoil_energy_kev_ee:.1f}" +"\,\mathrm{keV}_{\mathrm{ee}}$",
+#            x = (ax1.transAxes + ax1.transData.inverted()).inverted().transform([plot_energy_contour_x[index]+plot_energy_contours_label_spacing,1])[0],
+            x = plot_energy_contours_pos_ER[k],
+            y = 0.003,
+            s = r"$" +f"{recoil_energy_kev_ee:.1f}" +"\,\mathrm{keV}_{\mathrm{ER}}$",
             transform = ax1.transAxes,
-            fontsize = 8,
+            fontsize = 5,
+            rotation = plot_energy_contours_rotations[k],
+            color = "black",
+            horizontalalignment = "left",
+            verticalalignment = "bottom",)
+        ax1.text(
+#            x = (ax1.transAxes + ax1.transData.inverted()).inverted().transform([plot_energy_contour_x[index]-plot_energy_contours_label_spacing,1])[0],
+            x = plot_energy_contours_pos_NR[k],
+            y = 0.003,
+            s = r"$" +f"{convert_recoil_energy_scale(recoil_energy_kev_ee, 'ER'):.1f}" +"\,\mathrm{keV}_{\mathrm{NR}}$",
+            transform = ax1.transAxes,
+            fontsize = 5,
+            rotation = plot_energy_contours_rotations[k],
             color = "black",
             horizontalalignment = "left",
             verticalalignment = "bottom",)
 
     # graying out the data outside the WIMP eroi
-    #if flag_gray_out_events_outside_wimp_eroi:
-    #    format_dict.update({
-    #        "alpha" : 1,
-    #        "facecolors" : "grey",
-    #    })
-    #    ax1.scatter(plot_x_data, plot_y_data, **format_dict,)
-    left_energy_contour_x_data = energy_contour_data[0][0]
-    left_energy_contour_y_data = energy_contour_data[0][1]
-    right_energy_contour_x_data = energy_contour_data[-1][0]
-    right_energy_contour_y_data = energy_contour_data[-1][1]
-    ax1.fill_between(
-        x = left_energy_contour_x_data,
-        y1 = left_energy_contour_y_data,
-        y2 = [0 for val in left_energy_contour_y_data],
-        color = "white",
-        zorder = 1,
-        linewidth = 0,)
-    ax_ylim = ax1.get_ylim
-    print(ax_ylim)
-    ax1.fill_between(
-        x = right_energy_contour_x_data,
-        y1 = [100000 for val in right_energy_contour_x_data],
-        y2 = right_energy_contour_y_data,
-        color = "white",
-        zorder = 1,
-        linewidth = 0,)
+    if flag_gray_out_events_outside_wimp_eroi==True:
+        left_energy_contour_x_data = energy_contour_data[0][0]
+        left_energy_contour_y_data = energy_contour_data[0][1]
+        right_energy_contour_x_data = energy_contour_data[-1][0]
+        right_energy_contour_y_data = energy_contour_data[-1][1]
+        ax1.fill_between(
+            x = left_energy_contour_x_data,
+            y1 = left_energy_contour_y_data,
+            y2 = [0 for val in left_energy_contour_y_data],
+            color = "#dbdbdb",
+            zorder = 1,
+            linewidth = 0,)
+        ax1.fill_between(
+            x = right_energy_contour_x_data,
+            y1 = [100000 for val in right_energy_contour_x_data],
+            y2 = right_energy_contour_y_data,
+            color = "#dbdbdb",
+            zorder = 1,
+            linewidth = 0,)
 
     # plot discrimination line
     dl_x_data = plot_discrimination_line_dict["dl_x_data_s1_over_g1"] if plot_axes_units=="cs2_over_cs1_vs_cs1_over_g1" else plot_discrimination_line_dict["dl_x_data_s1"]
@@ -2590,7 +2617,8 @@ def gen_signature_plot(
         dl_x_data,
         dl_y_data,
         linestyle = "-",
-        linewidth = 0.5,
+        linewidth = 1.1,
+        label = r"discrimination line: $\mathcal{D}({^{\star}P})=(" +f"{plot_discrimination_line_dict['leakage_fraction']*1000:.2f}" +r"\pm" +f"{1000*plot_discrimination_line_dict['leakage_fraction_uncertainty']:.2f}" +r")\,\permil$",
         color = "black",)
 
 #        "nr_acceptance": float(nr_acceptance),
@@ -2611,14 +2639,91 @@ def gen_signature_plot(
         text_annotation_dict.update(text_dict)
         ax1.text(**text_annotation_dict)
 
+    # adding a heat map to indicate the NR band
+    if flag_histogram_nr_background!=False:
+        if flag_verbose: print(f"{fn}: adding NR band pdf")
+        axis_limits_x = ax1.get_xlim()
+        axis_limits_y = ax1.get_ylim()
+        x_bins = np.linspace(start=axis_limits_x[0], stop=axis_limits_x[1], num=flag_histogram_nr_background["n_bins_x"], endpoint=True)
+        y_bins = np.geomspace(start=axis_limits_y[0], stop=axis_limits_y[1], num=flag_histogram_nr_background["n_bins_y"], endpoint=True)
+        nr_events_within_wimp_eroi = len(reduce_nest_signature_to_eroi(
+            sim_ndarray = flag_histogram_nr_background["signature_ndarray"],
+            detector_dict = detector_dict,
+            eroi = [plot_energy_contours[0], plot_energy_contours[-1]],
+            s1_selection_window = [],
+            s2_selection_window = [], ))
+        print(f"'nr_events_within_wimp_eroi'={nr_events_within_wimp_eroi}")
+        plot_x_data, plot_y_data = convert_from_s2_vs_s1_to_s2_over_s1_vs_s1_over_g1(
+            flag_histogram_nr_background["signature_ndarray"]["S1_3Dcor [phd]"],
+            flag_histogram_nr_background["signature_ndarray"]["S2_3Dcorr [phd]"],
+            detector_dict)
+        weights_list = [1/nr_events_within_wimp_eroi for event in plot_x_data]
+        print(weights_list)
+        h2d = ax1.hist2d(
+            x = plot_x_data,
+            y = plot_y_data,
+            bins = [x_bins, y_bins],
+#            cmin = 1,
+            zorder = -3,
+            cmap = flag_histogram_nr_background["cmap"],
+            norm = mpl.colors.LogNorm(),
+            weights = weights_list,
+        )
+        ax2 = fig.add_subplot(spec[1,3])
+        fig.colorbar(h2d[3], cax=ax2)
+        if plot_xlim != [] : ax1.set_xlim(plot_xlim)
+        if plot_ylim != [] : ax1.set_ylim(plot_ylim)
+        ax2.set_ylabel(r"NR band probability density", fontsize=plot_fontsize_axis_label, labelpad=2)
+
+
+    # re-plotting all events below the discrimination line
+    if flag_re_plot_events_below_discrimination_line!=False:
+        if flag_verbose: print(f"{fn}: re-plotting all events below the discrimination line")
+        for signature_dict in signature_dict_list:
+            if flag_verbose: print(f"{fn}: re-plotting {signature_dict['label']}")
+
+            # selecting the data to be plotted
+            data = reduce_nest_signature_to_eroi(
+                sim_ndarray = signature_dict["signature_ndarray"],
+                detector_dict = detector_dict,
+                eroi = [plot_energy_contours[0], plot_energy_contours[-1]],
+                s1_selection_window = [],
+                s2_selection_window = [], )
+            if plot_axes_units == "cs2_over_cs1_vs_cs1_over_g1":
+                plot_x_data, plot_y_data = convert_from_s2_vs_s1_to_s2_over_s1_vs_s1_over_g1(data["S1_3Dcor [phd]"], data["S2_3Dcorr [phd]"], detector_dict)
+            elif plot_axes_units == "cs2_vs_cs1":
+                plot_x_data = data["S1_3Dcor [phd]"]
+                plot_y_data = data["S2_3Dcorr [phd]"]
+            plot_xy_data = [[x,y] for k, (x,y) in enumerate(zip(plot_x_data,plot_y_data)) if y<=np.interp(x=x, xp=plot_discrimination_line_dict["dl_x_data_s1_over_g1"], fp=plot_discrimination_line_dict["dl_y_data_s2_over_s1"])]
+            plot_x_data = [x for [x,y] in plot_xy_data]
+            plot_y_data = [y for [x,y] in plot_xy_data]
+
+            # formatting the current signature
+            format_dict = default_scatter_format_dict.copy()
+            for key in [k for k in [*signature_dict] if k not in ["signature_ndarray", "latex_label"]]:
+                format_dict.update({key : signature_dict[key]})
+                format_dict.update(flag_re_plot_events_below_discrimination_line)
+
+            # plotting the current signature
+            ax1.scatter(plot_x_data, plot_y_data, **format_dict)
+
+
     # legend
-    if flag_verbose: print(f"{fn}: legend")
-    if plot_legend : ax1.legend(
-        loc = "center",
-        labelspacing = plot_legend_labelspacing,
-        fontsize = plot_legend_fontsize,
-        bbox_to_anchor = plot_legend_bbox_to_anchor,
-        bbox_transform = ax1.transAxes,)
+    if plot_legend:
+        if flag_verbose: print(f"{fn}: legend")
+        handles, labels = ax1.get_legend_handles_labels()
+        handles = [handles[4], handles[5], handles[6], handles[0]]
+        
+        labels = [labels[4], labels[5], labels[6], labels[0]]
+        print(labels)
+        ax1.legend(
+            handles,
+            labels,
+            loc = "best",
+            labelspacing = plot_legend_labelspacing,
+            fontsize = plot_legend_fontsize,
+            bbox_to_anchor = plot_legend_bbox_to_anchor,
+            bbox_transform = ax1.transAxes,)
 
     # saving
     if flag_verbose: print(f"{fn}: saving")
@@ -2804,8 +2909,8 @@ def conduct_cartesian_product_of_leakage_fraction_checks(
             approx_depth = 24,
             verbose = False,)
         #sfs.write_dict_to_json(abspath_discrimination_lines +"example__discrimination_line__default_darwin_detector.json", discrimination_line_dict)
-        leakage_fraction = 1-discrimination_line_dict["er_rejection"]
-        leakage_fraction_uncertainty = discrimination_line_dict["er_rejection_uncertainty"]
+        leakage_fraction = discrimination_line_dict["leakage_fraction"]
+        leakage_fraction_uncertainty = discrimination_line_dict["leakage_fraction_uncertainty"]
         print(f"\t\t'leakage_fraction'={leakage_fraction}")
         print(f"\t\t'leakage_fraction_uncertainty'={leakage_fraction_uncertainty}")
 
@@ -2967,8 +3072,9 @@ def calc_er_nr_discrimination_line(
         "dl_y_data_s2": list(dl_S2_data),
         "nominal_nr_acceptance": float(nr_acceptance),
         "er_rejection": float(er_rejection),
+        "leakage_fraction": 1-float(er_rejection),
 #        "er_rejection_uncertainty": np.sqrt(2)*(np.sqrt(total_er)/total_er), # with Poissontian uncertainties approximated as np.sqrt, since statistics sufficiently high
-        "er_rejection_uncertainty": np.sqrt(((1/total_er)*np.sqrt(total_er_remaining))**2 +((total_er_remaining/total_er**2)*np.sqrt(total_er))**2),
+        "leakage_fraction_uncertainty": np.sqrt(((1/total_er)*np.sqrt(total_er_remaining))**2 +((total_er_remaining/total_er**2)*np.sqrt(total_er))**2),
 #        "nr_below_dl": list(nr_below_dl),
     }
 

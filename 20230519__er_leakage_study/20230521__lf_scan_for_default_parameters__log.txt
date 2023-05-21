@@ -1,0 +1,546 @@
+
+
+
+################################################################################
+starting subdataset 'e_drift_scan' simulation at 2023-05-21 03:21:24.526232
+################################################################################
+
+
+starting leakage fraction check for 10 detectors at 't_i' = 2023-05-21 03:21:24.526634
+starting check #1/10
+	parameters:
+		'e_drift' =  20.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.08061858013553636
+		'leakage_fraction_uncertainty'=0.0005562596580129926
+	finished check #1/10 at 03:27:01 h after 0:05:37 h
+starting check #2/10
+	parameters:
+		'e_drift' =  60.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.013274446247190874
+		'leakage_fraction_uncertainty'=0.00021852555193549786
+	finished check #2/10 at 03:32:36 h after 0:05:35 h
+starting check #3/10
+	parameters:
+		'e_drift' =  100.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.006773331250687797
+		'leakage_fraction_uncertainty'=0.00015558903299043846
+	finished check #3/10 at 03:37:48 h after 0:05:11 h
+starting check #4/10
+	parameters:
+		'e_drift' =  140.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.005726986426367597
+		'leakage_fraction_uncertainty'=0.00014300427544191723
+	finished check #4/10 at 03:42:46 h after 0:04:57 h
+starting check #5/10
+	parameters:
+		'e_drift' =  180.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.005352988189325947
+		'leakage_fraction_uncertainty'=0.00013826076183288301
+	finished check #5/10 at 03:47:41 h after 0:04:55 h
+starting check #6/10
+	parameters:
+		'e_drift' =  220.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.0046599348603617585
+		'leakage_fraction_uncertainty'=0.00012895033358992819
+	finished check #6/10 at 03:52:37 h after 0:04:55 h
+starting check #7/10
+	parameters:
+		'e_drift' =  260.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.004429371782839864
+		'leakage_fraction_uncertainty'=0.0001257600830493386
+	finished check #7/10 at 03:57:31 h after 0:04:53 h
+starting check #8/10
+	parameters:
+		'e_drift' =  300.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.004389812509544955
+		'leakage_fraction_uncertainty'=0.00012513761857595466
+	finished check #8/10 at 04:02:21 h after 0:04:50 h
+starting check #9/10
+	parameters:
+		'e_drift' =  340.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.006724211423699944
+		'leakage_fraction_uncertainty'=0.0001550676873145577
+	finished check #9/10 at 04:07:11 h after 0:04:50 h
+starting check #10/10
+	parameters:
+		'e_drift' =  380.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.009236588671960977
+		'leakage_fraction_uncertainty'=0.00018187416534566777
+	finished check #10/10 at 04:12:01 h after 0:04:49 h
+finished checking the leakage fraction of 10 detector configurations at 04:12:01 h after 0:50:36 h
+casting check results ndarray
+	'leakage_fraction_check_ndarray' column names:
+	'('e_drift', 'leakage_fraction', 'leakage_fraction_uncertainty')
+	(20., 0.08061858, 0.00055626)
+	(60., 0.01327445, 0.00021853)
+	(100., 0.00677333, 0.00015559)
+	(140., 0.00572699, 0.000143)
+	(180., 0.00535299, 0.00013826)
+	(220., 0.00465993, 0.00012895)
+	(260., 0.00442937, 0.00012576)
+	(300., 0.00438981, 0.00012514)
+	(340., 0.00672421, 0.00015507)
+	(380., 0.00923659, 0.00018187)
+the saved ndarray has the correct length and column names
+successfully finished leakage fraction check for 10 detectors at 't_i' = 2023-05-21 04:12:01.179252
+
+
+
+
+
+################################################################################
+starting subdataset 'g1_scan' simulation at 2023-05-21 04:12:01.211454
+################################################################################
+
+
+starting leakage fraction check for 10 detectors at 't_i' = 2023-05-21 04:12:01.211612
+starting check #1/10
+	parameters:
+		'g1' =  0.05
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from input parameters
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.008564238790716883
+		'leakage_fraction_uncertainty'=0.00017386956428501316
+	finished check #1/10 at 04:16:18 h after 0:04:16 h
+starting check #2/10
+	parameters:
+		'g1' =  0.06666666666666668
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from input parameters
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.007581284694686774
+		'leakage_fraction_uncertainty'=0.00016408264437653818
+	finished check #2/10 at 04:20:37 h after 0:04:19 h
+starting check #3/10
+	parameters:
+		'g1' =  0.08333333333333334
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from input parameters
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.006235609112548723
+		'leakage_fraction_uncertainty'=0.00014897128640537185
+	finished check #3/10 at 04:25:07 h after 0:04:29 h
+starting check #4/10
+	parameters:
+		'g1' =  0.1
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from input parameters
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.0056399839769154525
+		'leakage_fraction_uncertainty'=0.00014179602180819657
+	finished check #4/10 at 04:29:20 h after 0:04:12 h
+starting check #5/10
+	parameters:
+		'g1' =  0.11666666666666668
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from input parameters
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.005721043211454835
+		'leakage_fraction_uncertainty'=0.0001429440973032526
+	finished check #5/10 at 04:33:40 h after 0:04:20 h
+starting check #6/10
+	parameters:
+		'g1' =  0.13333333333333336
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from input parameters
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.004802606825168088
+		'leakage_fraction_uncertainty'=0.0001308785612000813
+	finished check #6/10 at 04:38:07 h after 0:04:26 h
+starting check #7/10
+	parameters:
+		'g1' =  0.15000000000000002
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from input parameters
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.004672847380895684
+		'leakage_fraction_uncertainty'=0.0001291608971436119
+	finished check #7/10 at 04:42:44 h after 0:04:36 h
+starting check #8/10
+	parameters:
+		'g1' =  0.16666666666666669
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from input parameters
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.004399677048766315
+		'leakage_fraction_uncertainty'=0.00012536873142037874
+	finished check #8/10 at 04:47:24 h after 0:04:40 h
+starting check #9/10
+	parameters:
+		'g1' =  0.18333333333333335
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from input parameters
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.004196207397283658
+		'leakage_fraction_uncertainty'=0.00012246425106339937
+	finished check #9/10 at 04:52:12 h after 0:04:47 h
+starting check #10/10
+	parameters:
+		'g1' =  0.2
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from input parameters
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.004192693040058426
+		'leakage_fraction_uncertainty'=0.00012241339725282014
+	finished check #10/10 at 04:57:08 h after 0:04:56 h
+finished checking the leakage fraction of 10 detector configurations at 04:57:08 h after 0:45:07 h
+casting check results ndarray
+	'leakage_fraction_check_ndarray' column names:
+	'('g1', 'leakage_fraction', 'leakage_fraction_uncertainty')
+	(0.05, 0.00856424, 0.00017387)
+	(0.06666667, 0.00758128, 0.00016408)
+	(0.08333333, 0.00623561, 0.00014897)
+	(0.1, 0.00563998, 0.0001418)
+	(0.11666667, 0.00572104, 0.00014294)
+	(0.13333333, 0.00480261, 0.00013088)
+	(0.15, 0.00467285, 0.00012916)
+	(0.16666667, 0.00439968, 0.00012537)
+	(0.18333333, 0.00419621, 0.00012246)
+	(0.2, 0.00419269, 0.00012241)
+the saved ndarray has the correct length and column names
+successfully finished leakage fraction check for 10 detectors at 't_i' = 2023-05-21 04:57:08.848691
+
+
+
+
+
+################################################################################
+starting subdataset 'E_gas_scan' simulation at 2023-05-21 04:57:08.873553
+################################################################################
+
+
+starting leakage fraction check for 10 detectors at 't_i' = 2023-05-21 04:57:08.873680
+starting check #1/10
+	parameters:
+		'E_gas' =  4.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.12160179480787725
+		'leakage_fraction_uncertainty'=0.000696920204781595
+	finished check #1/10 at 05:01:31 h after 0:04:22 h
+starting check #2/10
+	parameters:
+		'E_gas' =  4.888888888888889
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.026478310055567778
+		'leakage_fraction_uncertainty'=0.00031095041613155
+	finished check #2/10 at 05:05:54 h after 0:04:23 h
+starting check #3/10
+	parameters:
+		'E_gas' =  5.777777777777778
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.011957976659222491
+		'leakage_fraction_uncertainty'=0.00020727785177964949
+	finished check #3/10 at 05:10:19 h after 0:04:24 h
+starting check #4/10
+	parameters:
+		'E_gas' =  6.666666666666666
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.0076013363582462246
+		'leakage_fraction_uncertainty'=0.00016490202324552785
+	finished check #4/10 at 05:14:46 h after 0:04:27 h
+starting check #5/10
+	parameters:
+		'E_gas' =  7.555555555555555
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.005675376966569612
+		'leakage_fraction_uncertainty'=0.00014242005976724262
+	finished check #5/10 at 05:19:10 h after 0:04:24 h
+starting check #6/10
+	parameters:
+		'E_gas' =  8.444444444444445
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.0045869931053090784
+		'leakage_fraction_uncertainty'=0.00012790590824709495
+	finished check #6/10 at 05:23:35 h after 0:04:24 h
+starting check #7/10
+	parameters:
+		'E_gas' =  9.333333333333332
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.0040628049321387305
+		'leakage_fraction_uncertainty'=0.00012031053754790005
+	finished check #7/10 at 05:27:57 h after 0:04:22 h
+starting check #8/10
+	parameters:
+		'E_gas' =  10.222222222222221
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.003876258185086856
+		'leakage_fraction_uncertainty'=0.00011758188347598052
+	finished check #8/10 at 05:32:21 h after 0:04:23 h
+starting check #9/10
+	parameters:
+		'E_gas' =  11.11111111111111
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.0034500524081081396
+		'leakage_fraction_uncertainty'=0.0001109082767180906
+	finished check #9/10 at 05:36:45 h after 0:04:24 h
+starting check #10/10
+	parameters:
+		'E_gas' =  12.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.003559388865009616
+		'leakage_fraction_uncertainty'=0.00011264531035339545
+	finished check #10/10 at 05:41:05 h after 0:04:20 h
+finished checking the leakage fraction of 10 detector configurations at 05:41:05 h after 0:43:56 h
+casting check results ndarray
+	'leakage_fraction_check_ndarray' column names:
+	'('E_gas', 'leakage_fraction', 'leakage_fraction_uncertainty')
+	(4., 0.12160179, 0.00069692)
+	(4.88888889, 0.02647831, 0.00031095)
+	(5.77777778, 0.01195798, 0.00020728)
+	(6.66666667, 0.00760134, 0.0001649)
+	(7.55555556, 0.00567538, 0.00014242)
+	(8.44444444, 0.00458699, 0.00012791)
+	(9.33333333, 0.0040628, 0.00012031)
+	(10.22222222, 0.00387626, 0.00011758)
+	(11.11111111, 0.00345005, 0.00011091)
+	(12., 0.00355939, 0.00011265)
+the saved ndarray has the correct length and column names
+successfully finished leakage fraction check for 10 detectors at 't_i' = 2023-05-21 05:41:05.745400
+
+
+
+
+
+################################################################################
+starting subdataset 'eLife_us_scan' simulation at 2023-05-21 05:41:05.765691
+################################################################################
+
+
+starting leakage fraction check for 10 detectors at 't_i' = 2023-05-21 05:41:05.765786
+starting check #1/10
+	parameters:
+		'eLife_us' =  500.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.06369028147178879
+		'leakage_fraction_uncertainty'=0.0004908047120138172
+	finished check #1/10 at 05:45:33 h after 0:04:27 h
+starting check #2/10
+	parameters:
+		'eLife_us' =  2611.1111111111113
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.006936699509138777
+		'leakage_fraction_uncertainty'=0.00015750808267735332
+	finished check #2/10 at 05:49:56 h after 0:04:23 h
+starting check #3/10
+	parameters:
+		'eLife_us' =  4722.222222222223
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.005744637036931843
+		'leakage_fraction_uncertainty'=0.00014322446147482015
+	finished check #3/10 at 05:54:18 h after 0:04:22 h
+starting check #4/10
+	parameters:
+		'eLife_us' =  6833.333333333334
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.005559717256780172
+		'leakage_fraction_uncertainty'=0.00014088370377386437
+	finished check #4/10 at 05:58:39 h after 0:04:21 h
+starting check #5/10
+	parameters:
+		'eLife_us' =  8944.444444444445
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.0049091749315701705
+		'leakage_fraction_uncertainty'=0.00013242655286026473
+	finished check #5/10 at 06:03:04 h after 0:04:24 h
+starting check #6/10
+	parameters:
+		'eLife_us' =  11055.555555555557
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.004937193643762439
+		'leakage_fraction_uncertainty'=0.0001327046241430809
+	finished check #6/10 at 06:07:26 h after 0:04:22 h
+starting check #7/10
+	parameters:
+		'eLife_us' =  13166.666666666668
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.004784553033236105
+		'leakage_fraction_uncertainty'=0.00013067546369543542
+	finished check #7/10 at 06:11:54 h after 0:04:27 h
+starting check #8/10
+	parameters:
+		'eLife_us' =  15277.77777777778
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.005098705248646307
+		'leakage_fraction_uncertainty'=0.0001349392564561614
+	finished check #8/10 at 06:16:20 h after 0:04:25 h
+starting check #9/10
+	parameters:
+		'eLife_us' =  17388.88888888889
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.0046993181729448885
+		'leakage_fraction_uncertainty'=0.00012945204384607259
+	finished check #9/10 at 06:20:41 h after 0:04:21 h
+starting check #10/10
+	parameters:
+		'eLife_us' =  19500.0
+	generating the detector:
+		setting 'g1_gas'=0.96*'g1', with 'g1' taken from baseline detector
+	generating the ER signature:
+	generating the NR signature:
+	determining the leakage fraction:
+		'leakage_fraction'=0.004899731385284434
+		'leakage_fraction_uncertainty'=0.00013226700011281288
+	finished check #10/10 at 06:25:03 h after 0:04:22 h
+finished checking the leakage fraction of 10 detector configurations at 06:25:03 h after 0:43:58 h
+casting check results ndarray
+	'leakage_fraction_check_ndarray' column names:
+	'('eLife_us', 'leakage_fraction', 'leakage_fraction_uncertainty')
+	(500., 0.06369028, 0.0004908)
+	(2611.11111111, 0.0069367, 0.00015751)
+	(4722.22222222, 0.00574464, 0.00014322)
+	(6833.33333333, 0.00555972, 0.00014088)
+	(8944.44444444, 0.00490917, 0.00013243)
+	(11055.55555556, 0.00493719, 0.0001327)
+	(13166.66666667, 0.00478455, 0.00013068)
+	(15277.77777778, 0.00509871, 0.00013494)
+	(17388.88888889, 0.00469932, 0.00012945)
+	(19500., 0.00489973, 0.00013227)
+the saved ndarray has the correct length and column names
+successfully finished leakage fraction check for 10 detectors at 't_i' = 2023-05-21 06:25:03.813801
