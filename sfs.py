@@ -125,6 +125,19 @@ def write_dict_to_json(output_pathstring_json_file, save_dict):
     return
 
 
+def combine_and_sort_ndarrays(
+    list_of_ndarrays,
+    sort_column_name,
+):
+    """
+    This function is used to combine ndarrays (of the same dtype) and sort them according to a specified column name.
+    
+    """
+    combined_ndarray = np.concatenate(tuple(list_of_ndarrays))
+    combined_ndarray.sort(order=sort_column_name)
+    return combined_ndarray
+
+
 # This function is used to infer an absolute parameter value from a parameter interval.
 def get_absolute_parameter_value(
     parameter_interval,
@@ -2640,6 +2653,9 @@ def gen_signature_plot(
         ax1.text(**text_annotation_dict)
 
     # adding a heat map to indicate the NR band
+    # https://matplotlib.org/stable/tutorials/colors/colormaps.html (accessed: 21st May 2023)
+    # https://stackoverflow.com/questions/42387471/how-to-add-a-colorbar-for-a-hist2d-plot (accessed: 21st May 2023)
+    # https://www.tutorialspoint.com/how-to-plot-scatter-points-in-a-3d-figure-with-a-colorbar-in-matplotlib (irrelevant for plot below but interesting, accessed: 21st May 2023)
     if flag_histogram_nr_background!=False:
         if flag_verbose: print(f"{fn}: adding NR band pdf")
         axis_limits_x = ax1.get_xlim()
