@@ -1528,6 +1528,7 @@ def give_spectrum_dict(
     flag_return_non_integer_events          = False,
     flag_inhibit_scaling                    = False,
     flag_number_of_output_spectrum_dicts    = 1, # positive non-zero int, number of generated output dictionaries, only relevant if 'flag_spectrum_type'=='integral', if equals 1 a dictionary is returned, if greater than 1 a list of dictionaries is returned, this feature is used if many randomly-drawn populations are required, e.g., for simulations (then this function and the computation only needs to be called once)
+    flag_syst_flux_uncertainty_rel          = 0.0, # systematic uncertainty of the integral flux, scales the number of expected events by a factor of normal(1+flag_syst_flux_uncertainty_rel)
     # keywords
     spectrum_dict_default_values            = spectrum_dict_default_dict, # default 'spectrum_dict' values
     differential_rate_parameters            = {} # additional keyword argument values overwriting those from 'spectrum_dict_default_values'
@@ -1634,15 +1635,17 @@ def give_spectrum_dict(
         # looping over 'flag_number_of_output_spectrum_dicts'
         for k in range(flag_number_of_output_spectrum_dicts):
             if (flag_verbose and flag_number_of_output_spectrum_dicts != 1) : print(f"\tk={k}/{flag_number_of_output_spectrum_dicts-1}")
-
             # drawing the samples from the custom spectrum pdf according to the specified number of events 'num_events'
-            if (k != 0 and num_events=="exposure_poisson") : n_samples = np.random.default_rng(seed=seed).poisson(expected_number_of_events_float, 1)[0]
+            if (k != 0 and num_events=="exposure_poisson"):
+                flux_mod = expected_number_of_events_float*np.random.default_rng(seed=randrange(10000001)).normal(1, flag_syst_flux_uncertainty_rel, 1)[0]
+                n_samples = np.random.default_rng(seed=randrange(10000001)).poisson(flux_mod, 1)[0]
             if flag_verbose: print(f"\tdrawing {n_samples} samples from the custom spectrum pdf")
             samples = generate_samples_from_discrete_pdf(
                 random_variable_values = recoil_energy_kev_list,
                 pdf_values = expected_number_of_events_float_per_energy_bin,
                 nos = n_samples,
-                seed = seed,)
+                seed = seed if k!=0 else randrange(10000001),)
+#                flag_verbose = flag_verbose,)
     #        if flag_verbose: print(f"\tsamples: {samples}")
 
             # histogramming the drawn samples according to the specified bin centers 'recoil_energy_kev_list'
@@ -3508,6 +3511,7 @@ def generate_samples_from_discrete_pdf(
     pdf_values,               # list of floats, representing the discrete probabilities of the random variable values
     nos,                      # int, number of samples to be generated
     seed                      = randrange(10000001), # int, random seed for drawing samples
+    flag_verbose              = [False,True][1], # bool, flag indicating whether or not the function shall print output to the screen
 ):
 
     """
@@ -3516,8 +3520,11 @@ def generate_samples_from_discrete_pdf(
 
     cumulative_pdf_values = [np.sum(pdf_values[:k])for k in range(len((pdf_values))+1)]
     #print(f"'cumulative_pdf_values' : {cumulative_pdf_values})
+    if flag_verbose : print(f"'generate_samples_from_discrete_pdf': drawing samples form cumulative pdf")
     random_uniform_samples_within_cumulative_pdf_values_edges = np.random.default_rng(seed=seed).uniform(0, cumulative_pdf_values[-1],nos)
     random_uniform_samples_index_list = []
+    if flag_verbose : print(f"'generate_samples_from_discrete_pdf': determining the drawn samples' 'random_variable_values' indices")
+    ctr = 0
     for rus in random_uniform_samples_within_cumulative_pdf_values_edges:
         if rus==0:
             index = 0
@@ -3527,6 +3534,10 @@ def generate_samples_from_discrete_pdf(
             difference_betweeen_bin_edge_and_rus = np.array([np.inf if dval <0 else dval for dval in difference_betweeen_bin_edge_and_rus])
             index = np.argmin(difference_betweeen_bin_edge_and_rus)
         random_uniform_samples_index_list.append(index)
+        if ctr % 100000 == 0:
+            if flag_verbose : print(f"\tprocessed {ctr} samples")
+        ctr += 1
+    if flag_verbose : print(f"'generate_samples_from_discrete_pdf': determining the drawn samples' 'random_variable_values' values")
     samples = list([float(random_variable_values[index]) for index in random_uniform_samples_index_list])
     return samples
 
@@ -3671,6 +3682,8 @@ def calculate_wimp_parameter_exclusion_curve(
     spectrum__er_background_model,                                   # string, ER background model
     spectrum__nr_background_model,                                   # string, NR background model
     spectrum__wimp_model,                                            # string, WIMP model
+    spectrum__er_background_rel_syst_flux_uncertainty,               # float, systematic ER background flux uncertainty
+    spectrum__nr_background_rel_syst_flux_uncertainty,               # float, systematic NR background flux uncertainty
     # NEST settings
     
     # simulation setting
@@ -3974,7 +3987,7 @@ def calculate_wimp_parameter_exclusion_curve(
                 recoil_energy_kev_list         = spectrum_components_dict["wimps"]["recoil_energy_kev_list"],
                 abspath_spectra_files          = spectrum__resources,
                 exposure_t_y                   = detector__fiducial_mass_t *detector__runtime_y,
-                num_events                     = simulation__number_of_pdf_calculation_events,
+                num_events                     = int(simulation__number_of_pdf_calculation_events/10) if wimp_mass_gev<50 else simulation__number_of_pdf_calculation_events,
                 # nest parameters
                 seed                           = 1,
                 drift_field_v_cm               = detector__drift_field_v_cm,
@@ -4106,6 +4119,7 @@ def calculate_wimp_parameter_exclusion_curve(
             flag_return_non_integer_events          = flag_verbose_low_level,
             flag_inhibit_scaling                    = flag_verbose_low_level,
             flag_number_of_output_spectrum_dicts    = simulation__number_of_upper_limit_simulations_per_wimp_mass,
+            flag_syst_flux_uncertainty_rel          = spectrum__er_background_rel_syst_flux_uncertainty,
             spectrum_dict_default_values            = spectrum__default_spectrum_profiles,
             differential_rate_parameters            = {},)
         nr_background_spectrum_dict_list = give_spectrum_dict(
@@ -4122,6 +4136,7 @@ def calculate_wimp_parameter_exclusion_curve(
             flag_return_non_integer_events          = flag_verbose_low_level,
             flag_inhibit_scaling                    = flag_verbose_low_level,
             flag_number_of_output_spectrum_dicts    = simulation__number_of_upper_limit_simulations_per_wimp_mass,
+            flag_syst_flux_uncertainty_rel          = spectrum__nr_background_rel_syst_flux_uncertainty,
             spectrum_dict_default_values            = spectrum__default_spectrum_profiles,
             differential_rate_parameters            = {},)
         if flag_verbose : print(f"\t\tgenerating the ER and NR background 'signature's")
@@ -4177,8 +4192,8 @@ def calculate_wimp_parameter_exclusion_curve(
             pdf_er = spectrum_components_dict["er_background"]["spectral_pdf"]
             pdf_nr = spectrum_components_dict["nr_background"]["spectral_pdf"]
             pdf_wimps = spectrum_components_dict["wimps"]["spectral_pdf"]
-            theta_er_sigma = 0.3
-            theta_nr_sigma = 0.2
+            theta_er_sigma = spectrum__er_background_rel_syst_flux_uncertainty
+            theta_nr_sigma = spectrum__nr_background_rel_syst_flux_uncertainty
             n_obs_er = []
             n_obs_nr = []
             for b_row, be_row in enumerate(bin_edges_s2[:-1]):
