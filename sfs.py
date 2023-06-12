@@ -1644,7 +1644,8 @@ def give_spectrum_dict(
                 random_variable_values = recoil_energy_kev_list,
                 pdf_values = expected_number_of_events_float_per_energy_bin,
                 nos = n_samples,
-                seed = seed if k!=0 else randrange(10000001),)
+                seed = seed if k!=0 else randrange(10000001),
+                flag_verbose = flag_verbose,)
 #                flag_verbose = flag_verbose,)
     #        if flag_verbose: print(f"\tsamples: {samples}")
 
@@ -2411,8 +2412,11 @@ def execNEST(
 #    e_min = float(list(cmd_string.split(" "))[3])
 #    e_max = float(list(cmd_string.split(" "))[3])
 #    if len(this_nest_run_tuple_list) != num: raise Exception(f"This NEST run yielded {len(this_nest_run_tuple_list)} events instead of the specified {num} at E_min={e_min} and E_max={max}.")
-    execNEST_output_ndarray = np.concatenate(tuple(execNEST_output_ndarray_list))
-
+    try:
+        execNEST_output_ndarray = np.concatenate(tuple(execNEST_output_ndarray_list))
+    except:
+        print(f"ATTENZIONE: Could not concatenate ndarrays. Returning float(0.0) instead.")
+        return 0.0
 
 
     return execNEST_output_ndarray
@@ -2634,7 +2638,7 @@ def gen_signature_plot(
         dl_y_data,
         linestyle = "-",
         linewidth = 1.1,
-        label = r"discrimination line: $\mathcal{D}({^{\star}P})=(" +f"{plot_discrimination_line_dict['leakage_fraction']*1000:.2f}" +r"\pm" +f"{1000*plot_discrimination_line_dict['leakage_fraction_uncertainty']:.2f}" +r")\,\permil$",
+        label = r"discrimination line: $\mathcal{D}(\mathcal{P}^{\star})=(" +f"{plot_discrimination_line_dict['leakage_fraction']*1000:.2f}" +r"\pm" +f"{1000*plot_discrimination_line_dict['leakage_fraction_uncertainty']:.2f}" +r")\,\permil$",
         color = "black",)
 
 #        "nr_acceptance": float(nr_acceptance),
@@ -3643,14 +3647,20 @@ def compute_expected_number_of_events_within_eroi(
 
         # selecting the events falling into the EROI
         if flag_verbose : print(f"\t\tselecting the events falling into the EROI")
-        reduced_signature_data = reduce_nest_signature_to_eroi(
-            sim_ndarray             = signature_data,
-            detector_dict           = detector_dict,
-            eroi                    = selection_window_recoil_energy,
-            s1_selection_window     = selection_window_s1,
-            s2_selection_window     = selection_window_s2,)
-        number_of_events_within_eroi = len(reduced_signature_data)
-        number_of_events_within_eroi_list.append(number_of_events_within_eroi)
+        if signature_data != 0.0:
+            reduced_signature_data = reduce_nest_signature_to_eroi(
+                sim_ndarray             = signature_data,
+                detector_dict           = detector_dict,
+                eroi                    = selection_window_recoil_energy,
+                s1_selection_window     = selection_window_s1,
+                s2_selection_window     = selection_window_s2,)
+            number_of_events_within_eroi = len(reduced_signature_data)
+            number_of_events_within_eroi_list.append(number_of_events_within_eroi)
+        elif signature_data == 0.0:
+            number_of_events_within_eroi_list.append(0)
+        else:
+            raise Exception(f"Something weird was forwarded by 'execNEST': type(ndarray)={type(signature_data)}, 'signature_data'={signature_data}")
+
 
     # computing the expectation value as the arithmetic mean of all extracted numbers
     if flag_verbose : print(f"{fn}: computing expectation value as arithmetic mean")
@@ -4001,6 +4011,7 @@ def calculate_wimp_parameter_exclusion_curve(
                     "mw"                       : wimp_mass_gev, # GeV
                     "sigma_nucleon"            : limit__sigma_ref_val_cm2, # cm^2
                 })
+            write_dict_to_json("/home/daniel/Desktop/arbeitsstuff/sfs/github_repo_v2/temp/wimp_spectrum_dict.json", wimps_integral_spectrum_dict)
             # generating the high-statistics WIMP signature
             if flag_verbose : print(f"\t\tgenerating the high-statistics WIMP signature by executing NEST")
             wimp_spectrum_signature = execNEST(
@@ -4012,6 +4023,7 @@ def calculate_wimp_parameter_exclusion_curve(
                 abspath_list_detector_dict_json_output  = [],
                 flag_verbose                            = flag_verbose_low_level,
                 flag_print_stdout_and_stderr            = False,)
+            np.save("/home/daniel/Desktop/arbeitsstuff/sfs/github_repo_v2/temp/wimp_spectrum_ndarray.npy", wimp_spectrum_signature)
             wimp_spectrum_signature = reduce_nest_signature_to_eroi(
                 sim_ndarray     = wimp_spectrum_signature,
                 eroi            = limit__er_eroi_kev,
@@ -4470,6 +4482,8 @@ def calculate_wimp_parameter_exclusion_curve(
                 #plt.xscale("log")
                 #plt.yscale("log")
                 plt.show()
+                plt.savefig(f"/home/daniel/Desktop/arbeitsstuff/sfs/github_repo_v2/temp/upper_limit_distribution__{wimp_mass_gev}_gev.png")
+
 
 
 
