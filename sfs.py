@@ -32,6 +32,12 @@ import itertools
 import datetime
 
 
+# miscfig
+# NOTE: Delete once thesis is handed in!
+import sys
+pathstring_miscellaneous_figures = "/home/daniel/Desktop/arbeitsstuff/monxe/software/miscfig/"
+sys.path.append(pathstring_miscellaneous_figures)
+import Miscellaneous_Figures as miscfig
 
 
 ############################################
@@ -4553,8 +4559,10 @@ def plot_sensitivity_curve_comparison(
     legend_colors                   = [], # list of color strings, colors with which the sensitivity curves are plotted (ignored if 'flag_comp_values' is given)
     legend_labels                   = [], # list of latex strings, labels of the plotted sensitivity curves
     # plotting parameters
-    plot_width_ratios               = [0.07, 0.79, 0.02, 0.03, 0.09], # list of five floats adding up to 1.0, width ratios of the subplot windows
-    plot_height_ratios              = [0.005, 0.875, 0.12], # list of five floats adding up to 1.0, height ratios of the subplot windows
+    plot_aspect_ratio               = 9/16,
+    plot_width_ratios               = [0.115, 0.820, 0.02, 0.03, 0.015], # list of five floats adding up to 1.0, width ratios of the subplot windows
+    plot_height_ratios              = [0.005, 0.885, 0.11], # list of five floats adding up to 1.0, height ratios of the subplot windows
+    plot_fontsize_axis_label        = 11,
     plot_y_labelpad                 = 5.0, # float, labelpad of the y axis
     plot_x_labelpad                 = 0.0, # float, labelpad of the x axis
     plot_cbar_labelpad              = 6.0, # float, labelpad of the colorbar
@@ -4564,6 +4572,7 @@ def plot_sensitivity_curve_comparison(
     plot_y_axlim                    = [], # list of two floats, y-axis limits in cm^2, ignored if empty list
     limit__sigma_ref_val_cm2        = 10**(-45),
     # other
+    flag_plot_neutrino_fog          = [False,True][0],
     output_abspath_list             = [], # list of abspathstrings, the generated plot is saved as and to all specified locations
 ):
 
@@ -4638,7 +4647,7 @@ def plot_sensitivity_curve_comparison(
 
     # canvas
     fig = plt.figure(
-        figsize = [5.670, 5.670*9/16],
+        figsize = [5.670, 5.670*plot_aspect_ratio],
         constrained_layout = False,
         dpi = 150)
     if mode == 'cbar':
@@ -4651,10 +4660,10 @@ def plot_sensitivity_curve_comparison(
         ncols = 5 if mode=="cbar" else 3,
         nrows = 3,
         figure = fig,
-        top = 0.995,
-        bottom = 0.005,
-        left = 0.005,
-        right = 0.995,
+        top = 1.0,
+        bottom = 0.0,
+        left = 0.0,
+        right = 1.0,
         wspace = 0.0,
         hspace = 0.0,
         width_ratios = plot_width_ratios,
@@ -4662,8 +4671,8 @@ def plot_sensitivity_curve_comparison(
 
     # axes
     ax_plot = fig.add_subplot(spec[1, 1])
-    ax_plot.set_xlabel(r"WIMP mass, $m_{\chi}$ / $\mathrm{GeV}$", labelpad=plot_x_labelpad)
-    ax_plot.set_ylabel(r"SI WIMP-nucleon cross-section, $\sigma^{\mathrm{SI}}_{\chi,n}$ / $\mathrm{cm}^2$", labelpad=plot_y_labelpad)
+    ax_plot.set_xlabel(r"WIMP mass, $m_{\chi}$ / $\mathrm{GeV}$", labelpad=plot_x_labelpad, fontsize=plot_fontsize_axis_label)
+    ax_plot.set_ylabel(r"SI WIMP-nucleon cross-section, $\sigma^{\mathrm{SI}}_{\chi,p}$ / $\mathrm{cm^2}$", labelpad=plot_y_labelpad, fontsize=plot_fontsize_axis_label, loc="center")
     if plot_logxscale : ax_plot.set_xscale('log')
     if plot_logyscale : ax_plot.set_yscale('log')
     if mode == 'cbar':
@@ -4716,15 +4725,69 @@ def plot_sensitivity_curve_comparison(
         ax_plot.plot(
             data_dict["input"]["limit__wimp_mass_gev_list"],
             [y*x_section_scaling for y in data_dict["output"]["median_upper_limit_list"]],
-            color = "black",)
+            color = "white",
+            zorder = 2,)
         ax_plot.fill_between(
             data_dict["input"]["limit__wimp_mass_gev_list"],
             [y*x_section_scaling for y in data_dict["output"]["lower_upper_limit_list"]],
             [y*x_section_scaling for y in data_dict["output"]["upper_upper_limit_list"]],
             interpolate = True,
             color = color_list[k] if mode=='cbar' else legend_colors[k],
-            zorder = -1,
-            linewidth = 0)
+            linewidth = 0,
+            zorder = 2,)
+
+    # plotting the exclusion curves
+    if flag_plot_neutrino_fog:
+        for i, experiment_dict in enumerate(miscfig.dm_sensitivity_plot_experiments):
+            if experiment_dict["filename_data"] in ["dm_sensitivity__neutrino_fog.csv", "dm_sensitivity_plot__xenon1t__xenoncol18.csv", "dm_sensitivity_plot__xenonnt__xenoncoll20xenonntsensi.csv"]:
+                # data retrieval
+                x_data, y_data = miscfig.wpd_to_lists(filestring=experiment_dict["filename_data"], pathstring="/home/daniel/Desktop/arbeitsstuff/monxe/software/miscfig/input/")
+                # plotting the experiment data
+                ax_plot.plot(
+                    x_data,
+                    y_data,
+                    linewidth = 1,
+                    color = experiment_dict["color"],
+                    zorder = -1,
+                    linestyle = experiment_dict["linestyle"],)
+                # shading the excluded parameter space
+                if experiment_dict["shadeabove"] == True:
+                    ax_plot.fill_between(
+                        x_data,
+                        y_data,
+                        1,
+                        interpolate = True,
+                        color = "#d4d4d4",
+                        zorder = -5,
+                        linewidth = 0)
+                if experiment_dict["shadebelow"] == True:
+                    ax_plot.fill_between(
+                        x_data,
+                        y_data,
+                        0,
+                        interpolate = True,
+                        color = "#d4d4d4",
+                        zorder = -5,
+                        linewidth = 0)
+    for k, label in enumerate([
+        [r"XENON1T", [0.45, 0.78], 13],
+        [r"XENONnT", [0.7, 0.42], 13],
+        [r"DARWIN", [0.78, 0.19], 13],
+        [r"xenon neutrino fog", [0.82, 0.05], 0],
+    ]):
+        ax_plot.text(
+            label[1][0],
+            label[1][1],
+            s = label[0],
+            fontsize = 11,
+            color = "black" if k==3 else miscfig.colorstring_nrs,
+            rotation = label[2],
+            transform = ax_plot.transAxes,
+            zorder = 2,
+            horizontalalignment = "center",
+            verticalalignment = "center")
+
+
 
 
     # saving
